@@ -18,5 +18,7 @@ int main() {
 		m.print_usage();
 	}
 
+
+	st.print_stats();
 	cout << "Ending" << endl;
 }
