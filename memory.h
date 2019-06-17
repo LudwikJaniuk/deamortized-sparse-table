@@ -20,7 +20,7 @@ public:
 	}
 
 	unsigned read(size_t index) {
-		assert(0 <= index && index < data.size());
+		assert(index < data.size());
 		assert(occupied[index]);
 
 		n_reads++;
@@ -29,7 +29,7 @@ public:
 	}
 
 	void write(size_t index, unsigned value) {
-		assert(0 <= index && index < data.size());
+		assert(index < data.size());
 		data[index] = value;
 		occupied[index] = true;
 

@@ -10,6 +10,8 @@ int main() {
 	Memory m(10000);
 	Sparse_Table st(m);
 
+	return 0;
+
 	m.print_usage();
 	for(int i = 0; i < 9000; i++) {
 		st.insert_after(0, i);
