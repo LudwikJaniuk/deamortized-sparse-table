@@ -28,7 +28,7 @@ class Sparse_Table {
 		Node(Node *p = nullptr) : parent(p){};
 
 		size_t Usage() { return usage; };
-		bool is_leaf() { return (bool)left; }
+		bool is_leaf() { return !left; }
 
 		void init(size_t level, size_t index) {
 			cout << level;
@@ -80,6 +80,8 @@ class Sparse_Table {
 		Node *leaf_over(size_t index) {
 			Node * n;
 			for(n = this; n->left; n = n->child_over(index)) {}
+			assert(n->left == nullptr);
+			assert(n->is_leaf());
 			return n;
 		}
 
@@ -90,11 +92,10 @@ class Sparse_Table {
 
 			for(Node* p = this; p; p = p->parent) {
 				int new_usage = (int)p->usage + diff;
-				assert(0 <= new_usage && (size_t)new_usage < p->data_length);
+				assert(0 <= new_usage && (size_t)new_usage <= p->data_length);
 				p->usage = (size_t)new_usage;
 			}
 		}
-
 	};
 
 	Node tree;
