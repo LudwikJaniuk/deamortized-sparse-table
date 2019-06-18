@@ -21,6 +21,9 @@ class Sparse_Table {
 		Node* parent;
 		size_t data_index;
 		size_t data_length;
+		size_t primary_capacity;
+		size_t usable_capacity;
+		size_t m_level = 0;
 	private:
 		size_t usage = 0;
 	public:
@@ -36,22 +39,28 @@ class Sparse_Table {
 			right = nullptr;
 			buffer = nullptr;
 			data_index = index;
+			m_level = level;
 
-			if(level == 0) {
+			if(m_level == 0) {
 				data_length = L;
+				primary_capacity = L;
+				usable_capacity = L;
 			} else {
 				left = new Node(this);
-				left->init(level-1, index);
+				left->init(m_level-1, index);
 
 				right = new Node(this);
-				right->init(level-1, index + left->data_length);
+				right->init(m_level-1, index + left->data_length);
 
 				data_length = left->data_length + right->data_length;
+				primary_capacity = left->primary_capacity + right->primary_capacity;
+				usable_capacity = primary_capacity;
 
-				if (level >= lgL) {
+				if (m_level >= lgL) {
 					buffer = new Node(this);
-					buffer->init(level-lgL, index + data_length);
+					buffer->init(m_level-lgL, index + data_length);
 					data_length += buffer->data_length;
+					usable_capacity += buffer->primary_capacity;
 				} 
 			}
 		}
@@ -95,6 +104,85 @@ class Sparse_Table {
 				assert(0 <= new_usage && (size_t)new_usage <= p->data_length);
 				p->usage = (size_t)new_usage;
 			}
+		}
+
+		bool is_nonstrict_parent_of(Node* x) {
+			assert(x);
+			return this == x || is_parent_of(x);
+		}
+
+		bool is_parent_of(Node* x) {
+			assert(x);
+			return x->m_level < m_level
+			    && x->data_index >= data_index
+			    && (x->data_index + x->data_length) <= (data_index + data_length);
+		}
+
+		Node* first_lawful_parent() {
+			for(Node* n = this; n->parent; n = n->parent) {
+				Node* p = n->parent;
+				if(n != p->left) {
+					assert(n == p->right || n == n->buffer);
+					return p;
+				}
+			}
+			assert(false); // Fall out
+		}
+
+		// Will only return stuff from within itself, asserts nothing eelse required
+		size_t next_usable_strictly_left(size_t i) {
+			assert(!is_leaf());
+			assert(i > data_index);
+			assert(i <= data_index + data_length); // Allow i to be one-outsite my range.
+
+			Node *l = leaf_over(i);
+			assert(i >= l->data_index);
+
+			if(i > l->data_index) {
+				return i-1;
+			} else {
+				Node *p = l->first_lawful_parent();
+				assert(p);
+				assert(!p->is_leaf());
+				assert(is_nonstrict_parent_of(p));
+				assert(p->right->is_nonstrict_parent_of(l) 
+				    || p->buffer->is_nonstrict_parent_of(l));
+				Node *left_sibling = p->buffer && p->buffer->is_nonstrict_parent_of(l)
+					? p->right 
+					: p->left;
+				assert(is_parent_of(left_sibling));
+				return left_sibling->last_primary();
+			}
+		}
+
+		size_t n_th_usable(size_t n) {
+			assert(n < usable_capacity);
+			if (!buffer || n < primary_capacity) {
+				return n_th_primary(n);
+			}
+			return buffer->n_th_primary(n - primary_capacity);
+		}
+
+		// Takes a 0-starting ordinal, returns an index
+		size_t n_th_primary(size_t n) {
+			if(is_leaf()) {
+				assert(n < data_length);
+				return data_index + n;
+			} else {
+				assert(left);
+				assert(n < primary_capacity);
+				if (n < left->primary_capacity) {
+					return left->n_th_primary(n);
+				} else {
+					assert(right);
+					assert(n < left->primary_capacity + right->primary_capacity);
+					return right->n_th_primary(n - left->primary_capacity);
+				}
+			}
+		}
+
+		size_t last_primary() {
+			return n_th_primary(primary_capacity-1);
 		}
 	};
 
@@ -143,10 +231,36 @@ public:
 	}
 
 private:
+	void clean(Node *x);
 	void clean_if_necessary(size_t last_inserted_index);
 	size_t first_free_right_of(size_t index);
 	void shuffle_right(size_t left_border, size_t right_free);
+	size_t next_element_left(size_t i);
 };
+
+// Paper discusses maintaining a linked list of occupied elements to speed up this and other traversals.
+// This is faster to imlement right now.
+// TODO improve maybe
+// Note: there must be an element to the left. 
+// Note: Nonstrict as per paper.
+size_t Sparse_Table::next_element_left(size_t i) {
+	i++;
+	do { i--;
+		if (!m.is_free(i)) return i;
+	} while (i != 0);
+	assert(false); // Fall out
+}
+
+void Sparse_Table::clean(Node *x) {
+	cout << "Doign a cleaning!" << endl;
+	size_t w = x->n_th_usable(x->Usage());
+	do {
+		w = x->next_usable_strictly_left(w);
+		size_t r = next_element_left(w);
+		assert(r >= x->data_index);
+		m.write(w, m.read(r));
+	} while (w != x->data_index);
+}
 
 void Sparse_Table::insert_after(size_t index, unsigned value) {
 	size_t free_spot = first_free_right_of(index);
@@ -160,6 +274,16 @@ void Sparse_Table::insert_after(size_t index, unsigned value) {
 
 	// See if we need cleaning
 	// Optionally clean
+	Node *hobu; // Highest Overused Buffered Ancestor 
+	for(Node *option = tree.leaf_over(index+1); option; option = option->parent) {
+		if(!option->buffer) continue;
+		if(option->Usage() < option->usable_capacity) continue;
+		hobu = option;
+	}
+
+	if(hobu && hobu != &tree) {
+		clean(hobu->parent); // Todo
+	}
 }
 
 void Sparse_Table::clean_if_necessary(size_t last_inserted_index) {

@@ -16,6 +16,7 @@ public:
 	Memory(size_t size) : data(size), occupied(size, false){ };
 
 	bool is_free(size_t index) {
+		n_reads++;
 		return !occupied[index];
 	}
 
