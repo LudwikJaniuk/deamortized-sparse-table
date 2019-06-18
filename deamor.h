@@ -277,6 +277,7 @@ class Sparse_Table {
 			   << " lvl: " << m_level 
 			   << " lo: " << level_offset 
 			   << " usg: " << Usage() 
+			   << " prim:" << primary_capacity 
 			   << " us_cap:" << usable_capacity 
 			   << " tot_cap: " << data_length;
 			return ss.str();
@@ -377,8 +378,8 @@ void Sparse_Table::clean(Node *x) {
 	} while (w != x->data_index);
 
 	tree.recalculate_usage();
-
 	x->print_stats();
+	tree.print_stats();
 }
 
 void Sparse_Table::insert_after(size_t index, unsigned value) {
@@ -400,6 +401,7 @@ void Sparse_Table::insert_after(size_t index, unsigned value) {
 		hobu = option;
 	}
 
+	// If tree itself is overused, can't do any cleaning really. 
 	if(hobu && hobu != &tree) {
 		clean(hobu->parent); 
 	}
