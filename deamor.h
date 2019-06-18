@@ -1,11 +1,11 @@
 #include <cassert>
 #include <cmath>
 #include <string>
+#include <sstream>
 #include <iostream>
 #include "memory.h"
 
 using namespace std;
-
 
 class Sparse_Table {
 	Memory& m;
@@ -15,42 +15,77 @@ class Sparse_Table {
 	size_t capacity = 0;
 
 	struct Node {
-		Node* left;
-		Node* right;
-		Node* buffer;
-		Node* parent;
+		Node* parent = nullptr; // Set before init
+
+		// Level-wise, not always topologically
+		Node* l_sibling = nullptr;
+		Node* r_sibling = nullptr;
+
+		Node* left = nullptr;
+		Node* right = nullptr;
+		Node* buffer = nullptr;
+
 		size_t data_index;
 		size_t data_length;
 		size_t primary_capacity;
 		size_t usable_capacity;
 		size_t m_level = 0;
+		size_t level_offset = 0;
 	private:
 		size_t usage = 0;
 		const Memory& m;
+		Sparse_Table& st;
+		bool initialized = false;
 	public:
-
-		Node(Node *p, const Memory& mem) : parent(p), m(mem) {};
+		Node(Node *p, const Memory& mem, Sparse_Table& tab) 
+			: parent(p)
+			, m(mem)
+			, st(tab)
+		{};
 
 		size_t Usage() { return usage; };
-		bool is_leaf() { return !left; }
+		bool is_parent() { return left; }
+		bool is_leaf() { return !is_parent(); }
 
 		void init(size_t level, size_t index) {
-			cout << level;
-			left = nullptr;
-			right = nullptr;
-			buffer = nullptr;
 			data_index = index;
 			m_level = level;
+
+			if(parent == nullptr) {
+				assert(data_index == 0);
+				st.level_leftmost = vector<Node*>(level+1);
+				st.level_rightmost = vector<Node*>(level+1);
+			}
+
+			if(data_index == 0) {
+				level_offset = 0;
+				st.level_leftmost[level] = this;
+				st.level_rightmost[level] = this; // Assumes we're always the rightmost right now to be initialized
+			} else {
+				assert_parenthood();
+
+				assert(st.level_rightmost[level]);
+				assert(st.level_rightmost[level]->r_sibling == nullptr);
+
+				Node* ls = st.level_rightmost[level];
+				ls->r_sibling = this;
+				this->l_sibling = ls;
+				assert(l_sibling->initialized);
+				assert(l_sibling->m_level == m_level);
+
+				st.level_rightmost[level] = this;
+				level_offset = l_sibling->level_offset + 1;
+			}
 
 			if(m_level == 0) {
 				data_length = L;
 				primary_capacity = L;
 				usable_capacity = L;
 			} else {
-				left = new Node(this, m);
-				left->init(m_level-1, index);
+				left = new Node(this,  m, st);
+				left->init(m_level-1,  index);
 
-				right = new Node(this, m);
+				right = new Node(this, m, st);
 				right->init(m_level-1, index + left->data_length);
 
 				data_length = left->data_length + right->data_length;
@@ -58,12 +93,25 @@ class Sparse_Table {
 				usable_capacity = primary_capacity;
 
 				if (m_level >= lgL) {
-					buffer = new Node(this, m);
+					buffer = new Node(this, m, st);
 					buffer->init(m_level-lgL, index + data_length);
 					data_length += buffer->data_length;
 					usable_capacity += buffer->primary_capacity;
 				} 
 			}
+
+			initialized = true;
+		}
+
+
+		// We can't require that parent is initialized or complete since this is used in initialization to climb upwards
+		void assert_parenthood() {
+			assert(parent);
+			assert(this);
+			assert(parent->left);
+			assert(parent->left == this
+			    || (parent->right && parent->right == this && (m_level+1 == parent->m_level))
+			    || (parent->right && parent->buffer && parent->buffer == this && (m_level+lgL == parent->m_level)));
 		}
 
 		void recalculate_usage() {
@@ -146,16 +194,17 @@ class Sparse_Table {
 
 		Node* first_lawful_parent() {
 			for(Node* n = this; n->parent; n = n->parent) {
+				n->assert_parenthood();
 				Node* p = n->parent;
 				if(n != p->left) {
-					assert(n == p->right || n == n->buffer);
+					assert(n == p->right || n == p->buffer);
 					return p;
 				}
 			}
 			assert(false); // Fall out
 		}
 
-		// Will only return stuff from within itself, asserts nothing eelse required
+		// Will only return stuff from within itself, asserts nothing else required
 		size_t next_usable_strictly_left(size_t i) {
 			assert(!is_leaf());
 			assert(i > data_index);
@@ -168,16 +217,19 @@ class Sparse_Table {
 				return i-1;
 			} else {
 				Node *p = l->first_lawful_parent();
+
 				assert(p);
 				assert(!p->is_leaf());
 				assert(is_nonstrict_parent_of(p));
 				assert(p->right->is_nonstrict_parent_of(l) 
 				    || p->buffer->is_nonstrict_parent_of(l));
-				Node *left_sibling = p->buffer && p->buffer->is_nonstrict_parent_of(l)
+
+				Node *ps_left_sibling = p->buffer && p->buffer->is_nonstrict_parent_of(l)
 					? p->right 
 					: p->left;
-				assert(is_parent_of(left_sibling));
-				return left_sibling->last_primary();
+
+				assert(is_parent_of(ps_left_sibling));
+				return ps_left_sibling->last_primary();
 			}
 		}
 
@@ -210,8 +262,36 @@ class Sparse_Table {
 		size_t last_primary() {
 			return n_th_primary(primary_capacity-1);
 		}
+
+		string child_string() {
+			stringstream ss;
+			ss << (left ? "L" : " ")
+			   << (right ? "R" : " ")
+			   << (buffer ? "B" : " ");
+			return ss.str();
+		}
+		
+		string status() {
+			stringstream ss;
+			ss << child_string()
+			   << " lvl: " << m_level 
+			   << " lo: " << level_offset 
+			   << " usg: " << Usage() 
+			   << " us_cap:" << usable_capacity 
+			   << " tot_cap: " << data_length;
+			return ss.str();
+		}
+
+		void print_stats() {
+			cout << status() << endl;
+			if(left) cout << "L " << left->status() << endl;
+			if(right) cout << "R " << right->status() << endl;
+			if(buffer) cout << "B " << buffer->status() << endl;
+		}
 	};
 
+	vector<Node*> level_leftmost;
+	vector<Node*> level_rightmost;
 	Node tree;
 
 	void init_tree() {
@@ -245,7 +325,7 @@ class Sparse_Table {
 
 	}
 public:
-	Sparse_Table(Memory& mem) : m(mem), tree(nullptr, mem) {
+	Sparse_Table(Memory& mem) : m(mem), tree(nullptr, mem, *this) {
 		init_tree();
 		tree.recalculate_usage();
 	};
@@ -283,19 +363,7 @@ void Sparse_Table::clean(Node *x) {
 	assert(x->buffer);
 
 	cout << "Doign a cleaning " << endl;
-	cout << "On level " << x->m_level << endl;
-	cout << "Usage: " << x->Usage() << endl;
-	cout << "Usable capacity " << x->usable_capacity << endl;
-	cout << "Data_length " << x->data_length << endl;
-	cout << "L Usage: " << x->left->Usage() << endl;
-	cout << "L Usable capacity " << x->left->usable_capacity << endl;
-	cout << "L Data_length " << x->left->data_length << endl;
-	cout << "R Usage: " << x->right->Usage() << endl;
-	cout << "R Usable capacity " << x->right->usable_capacity << endl;
-	cout << "R Data_length " << x->right->data_length << endl;
-	cout << "B Usage: " << x->buffer->Usage() << endl;
-	cout << "B Usable capacity " << x->buffer->usable_capacity << endl;
-	cout << "B Data_length " << x->buffer->data_length << endl;
+	x->print_stats();
 
 	size_t w = x->n_th_usable(x->Usage());
 	do {
@@ -310,18 +378,7 @@ void Sparse_Table::clean(Node *x) {
 
 	tree.recalculate_usage();
 
-	cout << "Usage: " << x->Usage() << endl;
-	cout << "Usable capacity " << x->usable_capacity << endl;
-	cout << "Data_length " << x->data_length << endl;
-	cout << "L Usage: " << x->left->Usage() << endl;
-	cout << "L Usable capacity " << x->left->usable_capacity << endl;
-	cout << "L Data_length " << x->left->data_length << endl;
-	cout << "R Usage: " << x->right->Usage() << endl;
-	cout << "R Usable capacity " << x->right->usable_capacity << endl;
-	cout << "R Data_length " << x->right->data_length << endl;
-	cout << "B Usage: " << x->buffer->Usage() << endl;
-	cout << "B Usable capacity " << x->buffer->usable_capacity << endl;
-	cout << "B Data_length " << x->buffer->data_length << endl;
+	x->print_stats();
 }
 
 void Sparse_Table::insert_after(size_t index, unsigned value) {
