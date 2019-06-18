@@ -279,16 +279,49 @@ size_t Sparse_Table::next_element_left(size_t i) {
 }
 
 void Sparse_Table::clean(Node *x) {
-	cout << "Doign a cleaning!" << endl;
+	assert(!x->is_leaf());
+	assert(x->buffer);
+
+	cout << "Doign a cleaning " << endl;
+	cout << "On level " << x->m_level << endl;
+	cout << "Usage: " << x->Usage() << endl;
+	cout << "Usable capacity " << x->usable_capacity << endl;
+	cout << "Data_length " << x->data_length << endl;
+	cout << "L Usage: " << x->left->Usage() << endl;
+	cout << "L Usable capacity " << x->left->usable_capacity << endl;
+	cout << "L Data_length " << x->left->data_length << endl;
+	cout << "R Usage: " << x->right->Usage() << endl;
+	cout << "R Usable capacity " << x->right->usable_capacity << endl;
+	cout << "R Data_length " << x->right->data_length << endl;
+	cout << "B Usage: " << x->buffer->Usage() << endl;
+	cout << "B Usable capacity " << x->buffer->usable_capacity << endl;
+	cout << "B Data_length " << x->buffer->data_length << endl;
+
 	size_t w = x->n_th_usable(x->Usage());
 	do {
 		w = x->next_usable_strictly_left(w);
 		size_t r = next_element_left(w);
 		assert(r >= x->data_index);
-		m.write(w, m.read(r));
+		if(r != w) {
+			m.write(w, m.read(r));
+			m.delete_at(r);
+		}
 	} while (w != x->data_index);
 
 	tree.recalculate_usage();
+
+	cout << "Usage: " << x->Usage() << endl;
+	cout << "Usable capacity " << x->usable_capacity << endl;
+	cout << "Data_length " << x->data_length << endl;
+	cout << "L Usage: " << x->left->Usage() << endl;
+	cout << "L Usable capacity " << x->left->usable_capacity << endl;
+	cout << "L Data_length " << x->left->data_length << endl;
+	cout << "R Usage: " << x->right->Usage() << endl;
+	cout << "R Usable capacity " << x->right->usable_capacity << endl;
+	cout << "R Data_length " << x->right->data_length << endl;
+	cout << "B Usage: " << x->buffer->Usage() << endl;
+	cout << "B Usable capacity " << x->buffer->usable_capacity << endl;
+	cout << "B Data_length " << x->buffer->data_length << endl;
 }
 
 void Sparse_Table::insert_after(size_t index, unsigned value) {
@@ -311,7 +344,7 @@ void Sparse_Table::insert_after(size_t index, unsigned value) {
 	}
 
 	if(hobu && hobu != &tree) {
-		clean(hobu->parent); // Todo
+		clean(hobu->parent); 
 	}
 }
 
