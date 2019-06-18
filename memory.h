@@ -6,7 +6,7 @@
 using namespace std;
 
 class Memory {
-	unsigned long n_reads = 0;
+	unsigned long mutable n_reads = 0;
 	unsigned long n_reads_last = 0;
 	unsigned long n_writes = 0;
 	unsigned long n_writes_last = 0;
@@ -15,12 +15,12 @@ public:
 	vector<bool> occupied;
 	Memory(size_t size) : data(size), occupied(size, false){ };
 
-	bool is_free(size_t index) {
+	bool is_free(size_t index) const {
 		n_reads++;
 		return !occupied[index];
 	}
 
-	unsigned read(size_t index) {
+	unsigned read(size_t index) const {
 		assert(index < data.size());
 		assert(occupied[index]);
 

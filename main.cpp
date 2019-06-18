@@ -7,7 +7,10 @@ using namespace std;
 int main() {
 	cout << "Mello World!" << endl;
 
-	Memory m(10000);
+	const size_t M_SIZE = 10000;
+	Memory m(M_SIZE);
+	m.write(0, M_SIZE+1); // Bypass api of ST to init it somehow
+
 	Sparse_Table st(m);
 
 	m.print_usage();

@@ -26,9 +26,10 @@ class Sparse_Table {
 		size_t m_level = 0;
 	private:
 		size_t usage = 0;
+		const Memory& m;
 	public:
 
-		Node(Node *p = nullptr) : parent(p){};
+		Node(Node *p, const Memory& mem) : parent(p), m(mem) {};
 
 		size_t Usage() { return usage; };
 		bool is_leaf() { return !left; }
@@ -46,10 +47,10 @@ class Sparse_Table {
 				primary_capacity = L;
 				usable_capacity = L;
 			} else {
-				left = new Node(this);
+				left = new Node(this, m);
 				left->init(m_level-1, index);
 
-				right = new Node(this);
+				right = new Node(this, m);
 				right->init(m_level-1, index + left->data_length);
 
 				data_length = left->data_length + right->data_length;
@@ -57,12 +58,37 @@ class Sparse_Table {
 				usable_capacity = primary_capacity;
 
 				if (m_level >= lgL) {
-					buffer = new Node(this);
+					buffer = new Node(this, m);
 					buffer->init(m_level-lgL, index + data_length);
 					data_length += buffer->data_length;
 					usable_capacity += buffer->primary_capacity;
 				} 
 			}
+		}
+
+		void recalculate_usage() {
+			usage = 0;
+			if(is_leaf()) {
+				size_t past_end = data_index + data_length;
+				for(size_t i = data_index; i < past_end; i++) {
+					usage += (size_t)(!m.is_free(i));
+				}
+				return;
+			}
+
+			assert(left);
+			left->recalculate_usage();
+			usage += left->Usage();
+
+			if(!right) { assert(!buffer); return; }
+
+			right->recalculate_usage();
+			usage += right->Usage();
+
+			if(!buffer) { return; }
+
+			buffer->recalculate_usage();
+			usage += buffer->Usage();
 		}
 
 		bool index_in_range(size_t index) {
@@ -219,8 +245,9 @@ class Sparse_Table {
 
 	}
 public:
-	Sparse_Table(Memory& mem) : m(mem) {
+	Sparse_Table(Memory& mem) : m(mem), tree(nullptr, mem) {
 		init_tree();
+		tree.recalculate_usage();
 	};
 	void insert_after(size_t index, unsigned value);
 	void delete_at(size_t index) {
@@ -260,6 +287,8 @@ void Sparse_Table::clean(Node *x) {
 		assert(r >= x->data_index);
 		m.write(w, m.read(r));
 	} while (w != x->data_index);
+
+	tree.recalculate_usage();
 }
 
 void Sparse_Table::insert_after(size_t index, unsigned value) {
