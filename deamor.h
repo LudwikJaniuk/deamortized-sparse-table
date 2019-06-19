@@ -3,6 +3,7 @@
 #include <string>
 #include <sstream>
 #include <iostream>
+#include <limits>
 #include "memory.h"
 
 using namespace std;
@@ -381,9 +382,11 @@ void Sparse_Table::clean(Node *x) {
 	}
 
 	size_t w = x->n_th_usable(x->Usage());
+	size_t r = numeric_limits<size_t>::max();
 	do {
 		w = x->next_usable_strictly_left(w);
-		size_t r = next_element_left(w);
+		r = next_element_left(min(r, w)); // Small departure from paper but we scan much faster this way
+		//size_t r = next_element_left(w); // Small departure from paper but we scan much faster this way
 		assert(r >= x->data_index);
 		if(r != w) {
 			m.write(w, m.read(r));

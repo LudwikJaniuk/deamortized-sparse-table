@@ -77,7 +77,26 @@ int main(int argc, char** argv) {
 	}
 	cout << endl;
 	m.print_summary();
-
 	if(verbose)st.print_stats();
+
+	unsigned int n = 0;
+	for(size_t i = 0; i < N_ELEMS; i++) {
+		if(m.is_free(i)) continue;
+
+		if(m.data[i] != N_ELEMS-n-1) {
+
+			cout << "INCORRECT" << " " << i << " " << m.data[i] << endl;
+			size_t step = N_ELEMS / 100;
+			for(size_t i = 0; i < N_ELEMS; i++) {
+				if(i % step == 0) {
+					cout << i << " " << m.data[i] << endl;
+				}
+			}
+			break;
+		}
+
+		n++;
+	}
+
 	cout << "Ending" << endl;
 }
