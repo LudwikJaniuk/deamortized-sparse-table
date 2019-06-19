@@ -209,13 +209,13 @@ public:
 		// Will only return stuff from within itself, asserts nothing else required
 		size_t next_usable_strictly_left(size_t i) {
 			assert(!is_leaf());
-			assert(i > data_index); // TODO Slack: +1 here beause data_index is a slack spot. THerefore it is not usable. 
+			assert(i > data_index+1); 
 			assert(i <= data_index + data_length); // Allow i to be one-outsite my range.
 
 			Node *l = leaf_over(i);
 			assert(i >= l->data_index);
 
-			if(i > l->data_index) { // TODO Slack: +1 here, this is probably the most important place.
+			if(i > l->data_index+1) { 
 				return i-1;
 			} else {
 				Node *p = l->first_lawful_parent();
@@ -231,7 +231,7 @@ public:
 					: p->left;
 
 				assert(is_parent_of(ps_left_sibling));
-				return ps_left_sibling->last_primary(); // TODO is last_primary slack-secured?
+				return ps_left_sibling->last_primary(); 
 			}
 		}
 
@@ -246,8 +246,8 @@ public:
 		// Takes a 0-starting ordinal, returns an index
 		size_t n_th_primary(size_t n) {
 			if(is_leaf()) {
-				assert(n < data_length); // TODO Slack -1
-				return data_index + n; // TODO Slack +1
+				assert(n < data_length-1);
+				return data_index + 1 + n; // Slack +1
 			} else {
 				assert(left);
 				assert(n < primary_capacity);
@@ -347,7 +347,7 @@ public:
 		cout << "tree usage: " << tree.Usage() << endl;
 	}
 
-	void leaf_size() {
+	size_t leaf_size() {
 		return L+1;
 	}
 
@@ -385,7 +385,7 @@ void Sparse_Table::clean(Node *x) {
 	x->read_index = numeric_limits<size_t>::max();
 	do { 
 		clean_step(x);
-	} while (x->write_index != x->data_index);
+	} while (x->write_index != x->n_th_usable(0));
 
 	tree.recalculate_usage(); // TODO THis will probbly be different more or less but no idea how exactly
 	if(verbose) {
