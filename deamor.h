@@ -31,6 +31,9 @@ public:
 		Node* right = nullptr;
 		Node* buffer = nullptr;
 
+		size_t write_index = 0;
+		size_t read_index = 0;
+
 		size_t data_index;
 		size_t data_length;
 		size_t primary_capacity;
@@ -360,7 +363,7 @@ public:
 
 private:
 	void clean(Node *x);
-	void clean_if_necessary(size_t last_inserted_index);
+	void clean_step(Node* x);
 	size_t first_free_right_of(int index);
 	void shuffle_right(size_t left_border, size_t right_free);
 	size_t next_element_left(size_t i);
@@ -388,24 +391,28 @@ void Sparse_Table::clean(Node *x) {
 		x->print_stats();
 	}
 
-	size_t w = x->n_th_usable(x->Usage());
-	size_t r = numeric_limits<size_t>::max();
-	do {
-		w = x->next_usable_strictly_left(w);
-		r = next_element_left(min(r, w)); // Small departure from paper but we scan much faster this way
-		//size_t r = next_element_left(w); // Small departure from paper but we scan much faster this way
-		assert(r >= x->data_index);
-		if(r != w) {
-			m.write(w, m.read(r));
-			m.delete_at(r);
-		}
-	} while (w != x->data_index);
+	x->write_index = x->n_th_usable(x->Usage());
+	x->read_index = numeric_limits<size_t>::max();
+	do { 
+		clean_step(x);
+	} while (x->write_index != x->data_index);
 
 	tree.recalculate_usage();
 	if(verbose) {
 		x->print_stats();
 		tree.print_stats();
 	}
+}
+
+void Sparse_Table::clean_step(Node* x) {
+		x->write_index = x->next_usable_strictly_left(x->write_index);
+		x->read_index = next_element_left(min(x->read_index, x->write_index)); // Small departure from paper but we scan much faster this way
+		//size_t r = next_element_left(w); // Small departure from paper but we scan much faster this way
+		assert(x->read_index >= x->data_index);
+		if(x->read_index != x->write_index) {
+			m.write(x->write_index, m.read(x->read_index));
+			m.delete_at(x->read_index);
+		}
 }
 
 void Sparse_Table::insert_after(int index, unsigned value) {
