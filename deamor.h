@@ -56,6 +56,11 @@ public:
 		bool is_parent() { return left; }
 		bool is_leaf() { return !is_parent(); }
 
+		size_t cleaning_treshold() {
+			// 2^l * (L + 1/2)
+			return (1 << m_level)*st.L + (1 << (m_level-1));
+		}
+
 		void init(size_t level, size_t index) {
 			data_index = index;
 			m_level = level;
@@ -433,7 +438,8 @@ void Sparse_Table::insert_after(int index, unsigned value) {
 	//for(Node *option = tree.leaf_over(index+1); option; option = option->parent) { // We want to clean from s2 not s1+1
 	for(Node *option = usage_leaf; option; option = option->parent) {
 		if(!option->buffer) continue;
-		if(option->Usage() < option->usable_capacity) continue;
+		//if(option->Usage() < option->usable_capacity) continue;
+		if(option->Usage() < option->cleaning_treshold()) continue; // Changing to a lower treshold
 		hobu = option;
 	}
 

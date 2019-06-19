@@ -24,6 +24,6 @@ DEAMORTIZATION
  0.1) Understand equlity and leftheaviness DONE
  0.2) Maintain leaf mapping explicitly DONE
  1) break cleanup into chunks DONE
- 2) start cleanups at lower treshold
+ 2) start cleanups at lower treshold DONE
  3) incorporate slack slots
  4) add checks for parent cleanup conflicts
