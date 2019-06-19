@@ -8,11 +8,16 @@
 using namespace std;
 
 class Sparse_Table {
+public:
 	Memory& m;
-	static const size_t L = 4;
-	static const size_t lgL = 2;
+	size_t L = 4;
+	size_t lgL = 2;
 	size_t depth = 0;
 	size_t capacity = 0;
+	bool verbose = false;
+	enum Strategy {
+		NOCLEAN, CLEAN
+	} strategy;
 
 	struct Node {
 		Node* parent = nullptr; // Set before init
@@ -78,9 +83,9 @@ class Sparse_Table {
 			}
 
 			if(m_level == 0) {
-				data_length = L;
-				primary_capacity = L;
-				usable_capacity = L;
+				data_length = st.L;
+				primary_capacity = st.L;
+				usable_capacity = st.L;
 			} else {
 				left = new Node(this,  m, st);
 				left->init(m_level-1,  index);
@@ -92,9 +97,9 @@ class Sparse_Table {
 				primary_capacity = left->primary_capacity + right->primary_capacity;
 				usable_capacity = primary_capacity;
 
-				if (m_level >= lgL) {
+				if (m_level >= st.lgL) {
 					buffer = new Node(this, m, st);
-					buffer->init(m_level-lgL, index + data_length);
+					buffer->init(m_level-st.lgL, index + data_length);
 					data_length += buffer->data_length;
 					usable_capacity += buffer->primary_capacity;
 				} 
@@ -111,7 +116,7 @@ class Sparse_Table {
 			assert(parent->left);
 			assert(parent->left == this
 			    || (parent->right && parent->right == this && (m_level+1 == parent->m_level))
-			    || (parent->right && parent->buffer && parent->buffer == this && (m_level+lgL == parent->m_level)));
+			    || (parent->right && parent->buffer && parent->buffer == this && (m_level+st.lgL == parent->m_level)));
 		}
 
 		void recalculate_usage() {
@@ -330,7 +335,7 @@ public:
 		init_tree();
 		tree.recalculate_usage();
 	};
-	void insert_after(size_t index, unsigned value);
+	void insert_after(int index, unsigned value);
 	void delete_at(size_t index) {
 		m.delete_at(index);
 	};
@@ -341,7 +346,7 @@ public:
 private:
 	void clean(Node *x);
 	void clean_if_necessary(size_t last_inserted_index);
-	size_t first_free_right_of(size_t index);
+	size_t first_free_right_of(int index);
 	void shuffle_right(size_t left_border, size_t right_free);
 	size_t next_element_left(size_t i);
 };
@@ -363,8 +368,10 @@ void Sparse_Table::clean(Node *x) {
 	assert(!x->is_leaf());
 	assert(x->buffer);
 
-	cout << "Doign a cleaning " << endl;
-	x->print_stats();
+	if(verbose) {
+		cout << "Doign a cleaning " << endl;
+		x->print_stats();
+	}
 
 	size_t w = x->n_th_usable(x->Usage());
 	do {
@@ -378,13 +385,16 @@ void Sparse_Table::clean(Node *x) {
 	} while (w != x->data_index);
 
 	tree.recalculate_usage();
-	x->print_stats();
-	tree.print_stats();
+	if(verbose) {
+		x->print_stats();
+		tree.print_stats();
+	}
 }
 
-void Sparse_Table::insert_after(size_t index, unsigned value) {
+void Sparse_Table::insert_after(int index, unsigned value) {
 	size_t free_spot = first_free_right_of(index);
-	if(free_spot != index+1) shuffle_right(index+1, free_spot);
+	size_t i_after = (size_t)(index+1);
+	if(free_spot != i_after) shuffle_right(i_after, free_spot);
 	m.write(index+1, value);
 	
 	Node *usage_leaf = tree.leaf_over(free_spot);
@@ -392,26 +402,21 @@ void Sparse_Table::insert_after(size_t index, unsigned value) {
 
 	usage_leaf->change_usage(1);
 
-	// See if we need cleaning
-	// Optionally clean
-	Node *hobu; // Highest Overused Buffered Ancestor 
-	for(Node *option = tree.leaf_over(index+1); option; option = option->parent) {
-		if(!option->buffer) continue;
-		if(option->Usage() < option->usable_capacity) continue;
-		hobu = option;
+	if(strategy == CLEAN) {
+		// See if we need cleaning
+		// Optionally clean
+		Node *hobu = nullptr; // Highest Overused Buffered Ancestor 
+		for(Node *option = tree.leaf_over(index+1); option; option = option->parent) {
+			if(!option->buffer) continue;
+			if(option->Usage() < option->usable_capacity) continue;
+			hobu = option;
+		}
+
+		// If tree itself is overused, can't do any cleaning really. 
+		if(hobu && hobu != &tree) {
+			clean(hobu->parent); 
+		}
 	}
-
-	// If tree itself is overused, can't do any cleaning really. 
-	if(hobu && hobu != &tree) {
-		clean(hobu->parent); 
-	}
-}
-
-void Sparse_Table::clean_if_necessary(size_t last_inserted_index) {
-	Node* leaf = tree.leaf_over(last_inserted_index);
-	assert(leaf);
-
-
 }
 
 // Does not modify tree
@@ -424,9 +429,10 @@ void Sparse_Table::shuffle_right(size_t left_border, size_t right_free) {
 	m.delete_at(left_border);
 }
 
-size_t Sparse_Table::first_free_right_of(size_t index) {
-	while(true) {
-		index++;
-		if (m.is_free(index)) return index;
+size_t Sparse_Table::first_free_right_of(int index) {
+	assert(index >= 0 || index == -1);
+	for(size_t i = index+1; i < m.data.size(); i++) {
+		if (m.is_free(i)) return i;
 	}
+	assert(false);
 }

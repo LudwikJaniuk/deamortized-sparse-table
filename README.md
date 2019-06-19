@@ -7,3 +7,10 @@ We can already do that with vector of course, but we can't add logging and measu
 Maybe a class called "memory".
 We initiate it, then can "read" and "write". 
 and it could either log stuff on each use, or batch the stats and output them later.
+
+NOCLEAN:
+	READS 	T 81055440	L 81037441	D 17999	WRITES 	T 40504501	L 40495501	D 9000
+
+CLEAN:
+	READS 	T 298079672	L 298079641	D 31	WRITES 	T 463537	L 463521	D 16
+

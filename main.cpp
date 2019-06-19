@@ -4,26 +4,45 @@
 
 using namespace std;
 
-int main() {
+int main(int argc, char** argv) {
 	cout << "Mello World!" << endl;
 
-	const size_t M_SIZE = 10000;
+	const size_t M_SIZE = 100000;
+	const size_t N_ELEMS =  9000;
 	Memory m(M_SIZE);
-	m.write(0, M_SIZE+1); // Bypass api of ST to init it somehow
 
 	Sparse_Table st(m);
 
-	m.print_usage();
-	// Soo when testing we need to have a first element. 
-	// We could write a function to "push_back" maybe...
-	// But another solution is just to hack the memory...
-	// but then the usage of the trees will be nonvalid, so no. 
-	// Except we need to have something for recalculating usage anyway after a clean
-	// So we might as well calc usage from the memory from the start.
-	for(int i = 0; i < 9000; i++) {
-		st.insert_after(0, i);
-		m.print_usage();
+	if(argc >= 2) {
+		if(argv[1][0] == 'c') {
+			st.strategy = Sparse_Table::Strategy::CLEAN;
+			cout << "CLEANING ON" << endl;
+		} else if (argv[1][0] == 'n'){
+			st.strategy = Sparse_Table::Strategy::NOCLEAN;
+			cout << "CLEANING off" << endl;
+		} else {
+			cout << "Invalid command line option" << endl;
+		}
 	}
+
+	bool verbose = false;
+	if(argc >= 3) {
+		if(argv[2][0] == 'v') {
+			verbose = true;
+			cout << "Verbosity on" << endl;
+		} else {
+			cout << "Invalid command line option 2" << endl;
+		}
+	}
+
+	st.verbose = verbose;
+
+	m.print_usage();
+	for(size_t i = 0; i < N_ELEMS; i++) {
+		st.insert_after(-1, i);
+		if (verbose || i % 1000 == 0) m.print_usage();
+	}
+	m.print_usage();
 
 
 	st.print_stats();

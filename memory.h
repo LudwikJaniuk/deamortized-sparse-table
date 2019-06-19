@@ -10,13 +10,15 @@ class Memory {
 	unsigned long n_reads_last = 0;
 	unsigned long n_writes = 0;
 	unsigned long n_writes_last = 0;
+	unsigned long mutable n_free_checks = 0;
+	unsigned long n_free_checks_last = 0;
 public:
 	vector<unsigned int> data;
 	vector<bool> occupied;
 	Memory(size_t size) : data(size), occupied(size, false){ };
 
 	bool is_free(size_t index) const {
-		n_reads++;
+		n_free_checks++;
 		return !occupied[index];
 	}
 
@@ -46,20 +48,22 @@ public:
 		cout << "\tREADS "
 		     << "\tT " 
 		     << n_reads
-		     << "\tL "
-		     << n_reads_last
 		     << "\tD "
 		     << n_reads - n_reads_last
 		     << "\tWRITES "
 		     << "\tT " 
 		     << n_writes
-		     << "\tL "
-		     << n_writes_last
 		     << "\tD "
 		     << n_writes - n_writes_last
+		     << "\tfree_checks "
+		     << "\tT " 
+		     << n_free_checks
+		     << "\tD "
+		     << n_free_checks - n_free_checks_last
 		     << endl;
 
 		n_reads_last = n_reads;
 		n_writes_last = n_writes;
+		n_free_checks_last = n_free_checks;
 	}
 };
