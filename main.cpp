@@ -70,9 +70,13 @@ int main(int argc, char** argv) {
 	}
 	st.verbose = verbose;
 
+	m.stats_checkpoint();
 	for(size_t i = 0; i < N_ELEMS; i++) {
 		st.insert_after(-1, i);
+
+		m.stats_checkpoint();
 		if (verbose) m.print_usage();
+
 		else if (i % 1000 == 0) cout << "." << flush;  
 	}
 	cout << endl;

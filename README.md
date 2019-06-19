@@ -18,3 +18,10 @@ TODOLIST:
 	 * Test different page size DONE
 	 * Reduce number of free checks? DONE
 	 * Implement deamortization 
+
+DEAMORTIZATION
+ 0) measure our pause times
+ 1) break cleanup into chunks
+ 2) start cleanups at lower treshold
+ 3) incorporate slack slots
+ 4) add checks for parent cleanup conflicts
