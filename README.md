@@ -19,11 +19,20 @@ TODOLIST:
 	 * Reduce number of free checks? DONE
 	 * Implement deamortization 
 
+COROLLARY 5.2
+alpha >= 9, L >= 32 in that case
+
 DEAMORTIZATION
  0) measure our pause times DONE
  0.1) Understand equlity and leftheaviness DONE
  0.2) Maintain leaf mapping explicitly DONE
  1) break cleanup into chunks DONE
  2) start cleanups at lower treshold DONE
- 3) incorporate slack slots
- 4) add checks for parent cleanup conflicts
+ 3) incorporate slack slots DONE
+ 3.1) adapt old code DONE
+ 4) adapt new algorithms
+ 4.1) Reframe as startcleanup/continuecleanup
+ 4.2) Maintain usage more relaxed
+ 5) add checks for parent cleanup conflicts
+
+AFter lots of coding, finding the bugs bery hard. Going to bet.

@@ -13,6 +13,7 @@ public:
 	Memory& m;
 	size_t L;
 	size_t lgL;
+	size_t alpha = 9;
 	size_t depth = 0;
 	size_t capacity = 0;
 	bool verbose = false;
@@ -31,8 +32,6 @@ public:
 		Node* right = nullptr;
 		Node* buffer = nullptr;
 
-		size_t write_index = 0;
-		size_t read_index = 0;
 
 		size_t data_index;
 		size_t data_length;
@@ -40,7 +39,14 @@ public:
 		size_t usable_capacity;
 		size_t m_level = 0;
 		size_t level_offset = 0;
+
+		bool pending_extra = false;
 	private:
+		bool usage_fresh = false;
+		bool is_cleaning = false;
+		size_t write_index = 0;
+		size_t read_index = 0;
+
 		size_t usage = 0;
 		const Memory& m;
 		Sparse_Table& st;
@@ -52,9 +58,43 @@ public:
 			, st(tab)
 		{};
 
-		size_t Usage() { return usage; };
+		size_t Usage() { assert(usage_fresh); return usage; };
 		bool is_parent() { return left; }
 		bool is_leaf() { return !is_parent(); }
+		bool get_is_cleaning() {
+			return is_cleaning;
+		}
+		void enable_cleaning(size_t w) {
+			assert(is_cleaning == false);
+
+			usage_fresh = false; // TODO PArt of my hacky scheme
+			set_w(w);
+			is_cleaning = true;
+		}
+		void disable_cleaning() {
+			assert(is_cleaning);
+			assert(st.writers[write_index] == this);
+
+			is_cleaning = false;
+			st.writers[write_index] = nullptr;
+			write_index = 0;
+		}
+		size_t get_w() {
+			assert(is_cleaning);
+			return write_index;
+		}
+		void set_w(size_t w) {
+			assert(index_in_range(w));
+
+			assert(st.writers[w] == nullptr);
+
+			if(is_cleaning) { // It's already active somewhere
+				assert(st.writers[write_index] == this);
+				st.writers[write_index] = nullptr;
+			}
+			st.writers[w] = this;
+			write_index = w;
+		}
 
 		size_t cleaning_treshold() {
 			// 2^l * (L + 1/2)
@@ -129,7 +169,33 @@ public:
 			    || (parent->right && parent->buffer && parent->buffer == this && (m_level+st.lgL == parent->m_level)));
 		}
 
+		void bubble_update_usage() {
+			for(Node* n = this; n; n = n->parent) {
+				n->update_usage();
+			}
+		}
+
+		// Make sure my usage matches my children
+		void update_usage() {
+			if(is_leaf()) {
+				recalculate_usage();
+				return;
+			}
+
+			usage = 0;
+			assert(left);
+			usage = left->Usage();
+			if(!right) { assert(!buffer); return; }
+
+			usage += right->Usage();
+			if(!buffer) return;
+
+			usage += buffer->Usage();
+		}
+
+		// Recalc my entire subtree
 		void recalculate_usage() {
+			usage_fresh = true;
 			usage = 0;
 			if(is_leaf()) {
 				size_t past_end = data_index + data_length;
@@ -156,6 +222,11 @@ public:
 
 		bool index_in_range(size_t index) { // No change for slack
 			return index >= data_index && index < data_index + data_length;
+		}
+
+		// [data_index, writeptr)
+		bool in_cleaning_interval(size_t i) {
+			return i >= data_index && i < write_index;
 		}
 
 		Node *leaf_over(size_t index) { // No change for slack
@@ -296,6 +367,7 @@ public:
 	vector<Node*> level_leftmost;
 	vector<Node*> level_rightmost;
 	vector<Node*> leaves;
+	vector<Node*> writers;
 	Node tree;
 
 	void init_tree() {
@@ -322,12 +394,16 @@ public:
 
 		cout << "depth is on " << depth << endl;
 		cout << "capacity is on " << capacity << endl;
+
 		tree.init(depth, 0);
 		cout << endl;
+
+		assert(leaves.size() != 0);
+		writers = vector<Node*>(leaves.size(), nullptr);
+
 		cout << "Prim cap:" << tree.primary_capacity << endl;
 		cout << "usable cap:" << tree.usable_capacity << endl;
 		cout << "DATA LEN: " << tree.data_length << endl;
-
 	}
 public:
 	Sparse_Table(Memory& mem, size_t p_L, size_t p_lgL) 
@@ -352,12 +428,25 @@ public:
 	}
 
 private:
-	void clean(Node *x);
-	void clean_step(Node* x);
+	void clean(Node *);
+	void clean_step(Node *);
+	void start_cleanup(Node *);
+	void continue_cleanup(Node *);
+
 	size_t first_free_right_of(int index);
+	bool is_slack(size_t);
+	Node* writer_at(size_t);
 	void shuffle_right(size_t left_border, size_t right_free);
 	size_t next_element_left(size_t i);
 };
+
+Sparse_Table::Node* Sparse_Table::writer_at(size_t i) {
+	return writers[i]; 
+}
+
+bool Sparse_Table::is_slack(size_t i) {
+	return i == tree.leaf_over(i)->data_index;
+}
 
 // Paper discusses maintaining a linked list of occupied elements to speed up this and other traversals.
 // This is faster to imlement right now.
@@ -372,6 +461,7 @@ size_t Sparse_Table::next_element_left(size_t i) { // No change for slack
 	assert(false); // Fall out
 }
 
+/*
 void Sparse_Table::clean(Node *x) {
 	assert(!x->is_leaf());
 	assert(x->buffer);
@@ -381,11 +471,10 @@ void Sparse_Table::clean(Node *x) {
 		x->print_stats();
 	}
 
-	x->write_index = x->n_th_usable(x->Usage());
-	x->read_index = numeric_limits<size_t>::max();
+	x->set_w(x->n_th_usable(x->Usage()))
 	do { 
 		clean_step(x);
-	} while (x->write_index != x->n_th_usable(0));
+	} while (x->get_w() != x->n_th_usable(0));
 
 	tree.recalculate_usage(); // TODO THis will probbly be different more or less but no idea how exactly
 	if(verbose) {
@@ -393,42 +482,99 @@ void Sparse_Table::clean(Node *x) {
 		tree.print_stats();
 	}
 }
+*/
 
-void Sparse_Table::clean_step(Node* x) { // TODO ALgo will chnage but not right now with slacks
-	x->write_index = x->next_usable_strictly_left(x->write_index);
-	x->read_index = next_element_left(min(x->read_index, x->write_index)); // Small departure from paper but we scan much faster this way
-	//size_t r = next_element_left(w); 
-	assert(x->read_index >= x->data_index); // No change for slack here
-	if(x->read_index != x->write_index) {
-		m.write(x->write_index, m.read(x->read_index));
-		m.delete_at(x->read_index);
+void Sparse_Table::start_cleanup(Node* y) {
+	y->enable_cleaning(y->n_th_usable(y->Usage()));
+	assert(y->pending_extra == false);
+	y->pending_extra = false;
+	continue_cleanup(y);
+
+
+	// TODO  When startup returns, update usage of endpoints of zero gap, and  more...
+}
+
+// Ignoring second param from paper, probbly also a mistake
+void Sparse_Table::continue_cleanup(Node* y) {
+	for(size_t i = 0; i < alpha*L && y->get_is_cleaning(); i++) {
+		clean_step(y);
 	}
+
+}
+
+void Sparse_Table::clean_step(Node* y) { 
+	y->set_w( y->pending_extra  // Opposite from paper because I believe that one's a mistake
+	        ? y->get_w()-1
+		: y->next_usable_strictly_left(y->get_w()));
+
+	if(is_slack(y->get_w())) {
+		y->pending_extra = false;
+	}
+	size_t r = next_element_left(y->get_w());
+	assert(r >= y->data_index); // No change for slack here
+
+	if(r != y->get_w()) {
+		m.write(y->get_w(), m.read(r));
+		m.delete_at(r);
+	}
+
+	// TODO WHen leaf finished, update usage
+	
+	Node* x = writer_at(r);
+	if(x && x != y) {
+		x->disable_cleaning();
+	}
+
+	if(y->get_w() == y->data_index + 1) {
+		y->disable_cleaning(); 
+	}
+
+	//y->read_index = next_element_left(min(y->read_index, y->write_index)); // Small departure from paper but we scan much faster this way
 }
 
 void Sparse_Table::insert_after(int index, unsigned value) {
-	size_t free_spot = first_free_right_of(index);
+	size_t s2 = first_free_right_of(index);
 	size_t i_after = (size_t)(index+1);
-	if(free_spot != i_after) shuffle_right(i_after, free_spot);
+	if(s2 != i_after) shuffle_right(i_after, s2);
 	m.write(index+1, value);
 	
-	Node *usage_leaf = tree.leaf_over(free_spot);
-	assert(usage_leaf);
+	Node *s2_leaf = tree.leaf_over(s2);
+	assert(s2_leaf);
 
-	usage_leaf->change_usage(1);
+	// Increment usage as per algo
+	s2_leaf->change_usage(1);
 
 	if(strategy == NOCLEAN) return;
 
 	// See if we need cleaning
-	Node *hobu = nullptr; // Highest Overused Buffered Ancestor 
-	for(Node *option = usage_leaf; option; option = option->parent) {
-		if(!option->buffer) continue;
-		if(option->Usage() < option->cleaning_treshold()) continue; // Changing to a lower treshold
-		hobu = option;
-	}
+	for(Node *x = s2_leaf; x && x->parent; x = x->parent) {
+		if(!x->buffer) continue;
 
-	// If tree itself is overused, can't do any cleaning really. 
-	if(hobu && hobu != &tree) {
-		clean(hobu->parent); 
+		Node *y = x->parent;
+		assert(y);
+		if(y->get_is_cleaning()) {
+			if(s2 >= y->data_index && s2 < y->get_w()) {
+				y->pending_extra = true;
+				// We just inserted something inside of y's ongoing cleaning
+			}
+			continue_cleanup(y);
+		} else {
+			// Check for ancestor cleaning
+			bool can_start = true;
+			for(Node* p = y->parent; p; p = p->parent) {
+				if(p->get_is_cleaning()
+					&& y->in_cleaning_interval(p->get_w())) {
+					can_start = false;
+					break;
+				}
+			}
+
+			// Hacky, ineffieient, but faster to implement and there is already too much insecurity
+			x->recalculate_usage(); // TODO
+			if(can_start && x->Usage() >= x->cleaning_treshold()) {
+				start_cleanup(y);
+			}
+		}
 	}
 }
 
