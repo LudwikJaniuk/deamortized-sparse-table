@@ -10,8 +10,8 @@ using namespace std;
 class Sparse_Table {
 public:
 	Memory& m;
-	size_t L = 4;
-	size_t lgL = 2;
+	size_t L;
+	size_t lgL;
 	size_t depth = 0;
 	size_t capacity = 0;
 	bool verbose = false;
@@ -327,11 +327,18 @@ public:
 		cout << "capacity is on " << capacity << endl;
 		tree.init(depth, 0);
 		cout << endl;
+		cout << "Prim cap:" << tree.primary_capacity << endl;
+		cout << "usable cap:" << tree.usable_capacity << endl;
 		cout << "DATA LEN: " << tree.data_length << endl;
 
 	}
 public:
-	Sparse_Table(Memory& mem) : m(mem), tree(nullptr, mem, *this) {
+	Sparse_Table(Memory& mem, size_t p_L, size_t p_lgL) 
+		: m(mem)
+		, L(p_L)
+		, lgL(p_lgL)
+		, tree(nullptr, mem, *this)
+	{
 		init_tree();
 		tree.recalculate_usage();
 	};

@@ -7,11 +7,42 @@ using namespace std;
 int main(int argc, char** argv) {
 	cout << "Mello World!" << endl;
 
-	const size_t M_SIZE = 100000;
-	const size_t N_ELEMS =  9000;
+	size_t M_SIZE = 100000;
+	size_t N_ELEMS =  9000;
+
+	size_t L = 4;
+	size_t lgL = 2;
+	if(argc >= 4) {
+		if(argv[3][0] == 'l') {
+			cout << "Manually set L" << endl;
+			cin >> L;
+			cout << "Manually set lgL (to the 2-log of L please)" << endl;
+			cin >> lgL;
+		} else if(argv[3][0] == 'n') {
+			cout << "Leaving L lgL as in source code" << endl;
+		} else {
+			cout << "Invalid command line option 3" << endl;
+		}
+	}
+
+	if(argc >= 5) {
+		if(argv[4][0] == 'd') {
+			cout << "Manually set M_SIZE" << endl;
+			cin >> M_SIZE;
+			cout << "Manually set N_ELEMS" << endl;
+			cin >> N_ELEMS;
+		} else if(argv[3][0] == 'n') {
+			cout << "Leaving M_SIZE N_ELEMS as in source code" << endl;
+		} else {
+			cout << "Invalid command line option 3" << endl;
+		}
+	}
+
 	Memory m(M_SIZE);
 
-	Sparse_Table st(m);
+	Sparse_Table st(m, L, lgL);
+
+
 
 	if(argc >= 2) {
 		if(argv[1][0] == 'c') {
@@ -30,21 +61,23 @@ int main(int argc, char** argv) {
 		if(argv[2][0] == 'v') {
 			verbose = true;
 			cout << "Verbosity on" << endl;
+		} else if(argv[2][0] == 'n') {
+			verbose = false;
+			cout << "Verbosity off" << endl;
 		} else {
 			cout << "Invalid command line option 2" << endl;
 		}
 	}
-
 	st.verbose = verbose;
 
-	m.print_usage();
 	for(size_t i = 0; i < N_ELEMS; i++) {
 		st.insert_after(-1, i);
-		if (verbose || i % 1000 == 0) m.print_usage();
+		if (verbose) m.print_usage();
+		else if (i % 1000 == 0) cout << "." << flush;  
 	}
-	m.print_usage();
+	cout << endl;
+	m.print_summary();
 
-
-	st.print_stats();
+	if(verbose)st.print_stats();
 	cout << "Ending" << endl;
 }

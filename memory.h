@@ -66,4 +66,10 @@ public:
 		n_writes_last = n_writes;
 		n_free_checks_last = n_free_checks;
 	}
+
+	void print_summary() {
+		cout << "R " << n_reads << " log10 " << log10(n_reads) << endl;
+		cout << "W " << n_writes << " log10 " << log10(n_writes) << endl;
+		cout << "C " << n_free_checks << " log10 " << log10(n_free_checks) << endl;
+	}
 };

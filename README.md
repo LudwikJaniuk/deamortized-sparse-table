@@ -14,3 +14,7 @@ NOCLEAN:
 CLEAN:
 	READS 	T 298079672	L 298079641	D 31	WRITES 	T 463537	L 463521	D 16
 
+TODOLIST:
+	 * Test different page size
+	 * Implement deamortization
+	 * Reduce number of free checks?
