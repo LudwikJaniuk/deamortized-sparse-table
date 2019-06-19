@@ -426,20 +426,20 @@ void Sparse_Table::insert_after(int index, unsigned value) {
 
 	usage_leaf->change_usage(1);
 
-	if(strategy == CLEAN) {
-		// See if we need cleaning
-		// Optionally clean
-		Node *hobu = nullptr; // Highest Overused Buffered Ancestor 
-		for(Node *option = tree.leaf_over(index+1); option; option = option->parent) {
-			if(!option->buffer) continue;
-			if(option->Usage() < option->usable_capacity) continue;
-			hobu = option;
-		}
+	if(strategy == NOCLEAN) return;
 
-		// If tree itself is overused, can't do any cleaning really. 
-		if(hobu && hobu != &tree) {
-			clean(hobu->parent); 
-		}
+	// See if we need cleaning
+	Node *hobu = nullptr; // Highest Overused Buffered Ancestor 
+	//for(Node *option = tree.leaf_over(index+1); option; option = option->parent) { // We want to clean from s2 not s1+1
+	for(Node *option = usage_leaf; option; option = option->parent) {
+		if(!option->buffer) continue;
+		if(option->Usage() < option->usable_capacity) continue;
+		hobu = option;
+	}
+
+	// If tree itself is overused, can't do any cleaning really. 
+	if(hobu && hobu != &tree) {
+		clean(hobu->parent); 
 	}
 }
 
