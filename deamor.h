@@ -58,7 +58,7 @@ public:
 
 		size_t cleaning_treshold() {
 			// 2^l * (L + 1/2)
-			return (1 << m_level)*st.L + (1 << (m_level-1));
+			return (1 << m_level)*st.L + (1 << (m_level-1)); // Even with slacks it's still the same treshold
 		}
 
 		void init(size_t level, size_t index) {
@@ -92,9 +92,9 @@ public:
 			}
 
 			if(m_level == 0) {
-				data_length = st.L;
-				primary_capacity = st.L;
-				usable_capacity = st.L;
+				data_length = st.leaf_size(); 
+				primary_capacity = st.L; // Slack nochange
+				usable_capacity = st.L; // Slack nochange
 				st.leaves.push_back(this);
 			} else {
 				left = new Node(this,  m, st);
@@ -107,7 +107,7 @@ public:
 				primary_capacity = left->primary_capacity + right->primary_capacity;
 				usable_capacity = primary_capacity;
 
-				if (m_level >= st.lgL) {
+				if (m_level >= st.lgL) { // Buffered!
 					buffer = new Node(this, m, st);
 					buffer->init(m_level-st.lgL, index + data_length);
 					data_length += buffer->data_length;
@@ -154,32 +154,15 @@ public:
 			usage += buffer->Usage();
 		}
 
-		bool index_in_range(size_t index) {
+		bool index_in_range(size_t index) { // No change for slack
 			return index >= data_index && index < data_index + data_length;
 		}
 
-		// Returns the child covering the index. One step in the iteration towards that leaf. 
-		// Must always be called with a child inrange.
-		// If leaf, will return null.
-		Node *child_over(size_t index) {
-			assert(index_in_range(index));
+		Node *leaf_over(size_t index) { // No change for slack
+			size_t ls = st.leaf_size();
+			assert(st.leaves[0]->data_length == ls);
 
-			if(!left) return nullptr; // we're a leaf
-
-			assert(right);
-			if(left->index_in_range(index)) return left;
-			if(right->index_in_range(index)) return right;
-
-			assert(buffer);
-			assert(buffer->index_in_range(index));
-			return buffer;
-		}
-
-		Node *leaf_over(size_t index) {
-			size_t leaf_size = st.L;
-			assert(st.leaves[0]->data_length == leaf_size);
-
-			size_t leaf_index = index / leaf_size;
+			size_t leaf_index = index / ls;
 			assert(st.leaves.size() > leaf_index);
 
 			Node *l = st.leaves[leaf_index];
@@ -187,7 +170,6 @@ public:
 
 			return l;
 		}
-
 
 		void change_usage(int diff) {
 			assert(is_leaf());
@@ -227,13 +209,13 @@ public:
 		// Will only return stuff from within itself, asserts nothing else required
 		size_t next_usable_strictly_left(size_t i) {
 			assert(!is_leaf());
-			assert(i > data_index);
+			assert(i > data_index); // TODO Slack: +1 here beause data_index is a slack spot. THerefore it is not usable. 
 			assert(i <= data_index + data_length); // Allow i to be one-outsite my range.
 
 			Node *l = leaf_over(i);
 			assert(i >= l->data_index);
 
-			if(i > l->data_index) {
+			if(i > l->data_index) { // TODO Slack: +1 here, this is probably the most important place.
 				return i-1;
 			} else {
 				Node *p = l->first_lawful_parent();
@@ -249,7 +231,7 @@ public:
 					: p->left;
 
 				assert(is_parent_of(ps_left_sibling));
-				return ps_left_sibling->last_primary();
+				return ps_left_sibling->last_primary(); // TODO is last_primary slack-secured?
 			}
 		}
 
@@ -264,8 +246,8 @@ public:
 		// Takes a 0-starting ordinal, returns an index
 		size_t n_th_primary(size_t n) {
 			if(is_leaf()) {
-				assert(n < data_length);
-				return data_index + n;
+				assert(n < data_length); // TODO Slack -1
+				return data_index + n; // TODO Slack +1
 			} else {
 				assert(left);
 				assert(n < primary_capacity);
@@ -320,10 +302,9 @@ public:
 		// Determine capacity
 		vector<size_t> level_capacity;
 		for(depth = 0; ; depth++) {
-
 			size_t required_mem = 0;
 			if (depth == 0) {
-				required_mem = L;
+				required_mem = leaf_size(); 
 			} else if (depth < lgL) {
 				required_mem = 2 * level_capacity[depth-1];
 			} else {
@@ -366,6 +347,10 @@ public:
 		cout << "tree usage: " << tree.Usage() << endl;
 	}
 
+	void leaf_size() {
+		return L+1;
+	}
+
 private:
 	void clean(Node *x);
 	void clean_step(Node* x);
@@ -379,7 +364,7 @@ private:
 // TODO improve maybe
 // Note: there must be an element to the left. 
 // Note: Nonstrict as per paper.
-size_t Sparse_Table::next_element_left(size_t i) {
+size_t Sparse_Table::next_element_left(size_t i) { // No change for slack
 	i++;
 	do { i--;
 		if (!m.is_free(i)) return i;
@@ -402,22 +387,22 @@ void Sparse_Table::clean(Node *x) {
 		clean_step(x);
 	} while (x->write_index != x->data_index);
 
-	tree.recalculate_usage();
+	tree.recalculate_usage(); // TODO THis will probbly be different more or less but no idea how exactly
 	if(verbose) {
 		x->print_stats();
 		tree.print_stats();
 	}
 }
 
-void Sparse_Table::clean_step(Node* x) {
-		x->write_index = x->next_usable_strictly_left(x->write_index);
-		x->read_index = next_element_left(min(x->read_index, x->write_index)); // Small departure from paper but we scan much faster this way
-		//size_t r = next_element_left(w); // Small departure from paper but we scan much faster this way
-		assert(x->read_index >= x->data_index);
-		if(x->read_index != x->write_index) {
-			m.write(x->write_index, m.read(x->read_index));
-			m.delete_at(x->read_index);
-		}
+void Sparse_Table::clean_step(Node* x) { // TODO ALgo will chnage but not right now with slacks
+	x->write_index = x->next_usable_strictly_left(x->write_index);
+	x->read_index = next_element_left(min(x->read_index, x->write_index)); // Small departure from paper but we scan much faster this way
+	//size_t r = next_element_left(w); 
+	assert(x->read_index >= x->data_index); // No change for slack here
+	if(x->read_index != x->write_index) {
+		m.write(x->write_index, m.read(x->read_index));
+		m.delete_at(x->read_index);
+	}
 }
 
 void Sparse_Table::insert_after(int index, unsigned value) {
@@ -435,10 +420,8 @@ void Sparse_Table::insert_after(int index, unsigned value) {
 
 	// See if we need cleaning
 	Node *hobu = nullptr; // Highest Overused Buffered Ancestor 
-	//for(Node *option = tree.leaf_over(index+1); option; option = option->parent) { // We want to clean from s2 not s1+1
 	for(Node *option = usage_leaf; option; option = option->parent) {
 		if(!option->buffer) continue;
-		//if(option->Usage() < option->usable_capacity) continue;
 		if(option->Usage() < option->cleaning_treshold()) continue; // Changing to a lower treshold
 		hobu = option;
 	}
