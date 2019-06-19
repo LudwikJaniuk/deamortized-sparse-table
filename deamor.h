@@ -87,6 +87,7 @@ public:
 				data_length = st.L;
 				primary_capacity = st.L;
 				usable_capacity = st.L;
+				st.leaves.push_back(this);
 			} else {
 				left = new Node(this,  m, st);
 				left->init(m_level-1,  index);
@@ -167,11 +168,16 @@ public:
 		}
 
 		Node *leaf_over(size_t index) {
-			Node * n;
-			for(n = this; n->left; n = n->child_over(index)) {}
-			assert(n->left == nullptr);
-			assert(n->is_leaf());
-			return n;
+			size_t leaf_size = st.L;
+			assert(st.leaves[0]->data_length == leaf_size);
+
+			size_t leaf_index = index / leaf_size;
+			assert(st.leaves.size() > leaf_index);
+
+			Node *l = st.leaves[leaf_index];
+			assert(l);
+
+			return l;
 		}
 
 
@@ -299,6 +305,7 @@ public:
 
 	vector<Node*> level_leftmost;
 	vector<Node*> level_rightmost;
+	vector<Node*> leaves;
 	Node tree;
 
 	void init_tree() {

@@ -20,7 +20,9 @@ TODOLIST:
 	 * Implement deamortization 
 
 DEAMORTIZATION
- 0) measure our pause times
+ 0) measure our pause times DONE
+ 0.1) Understand equlity and leftheaviness DONE
+ 0.2) Maintain leaf mapping explicitly DONE
  1) break cleanup into chunks
  2) start cleanups at lower treshold
  3) incorporate slack slots
