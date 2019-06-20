@@ -177,6 +177,7 @@ public:
 		// Set usage to 0 if this whole tre is insize the logic gap made by these two
 		void zero_if_subtree(size_t r, size_t w) { 
 			assert(r < w);
+			assert(this != &st.tree);
 			if(data_index > r && data_index + data_length - 1 < w) {
 				usage = 0;
 			}
@@ -207,13 +208,16 @@ public:
 
 			usage = 0;
 			assert(left);
-			usage = left->Usage();
+			//usage = left->Usage();
+			usage = left->usage;
 			if(!right) { assert(!buffer); return; }
 
-			usage += right->Usage();
+			//usage += right->Usage();
+			usage += right->usage;
 			if(!buffer) return;
 
-			usage += buffer->Usage();
+			//usage += buffer->Usage();
+			usage += buffer->usage;
 		}
 
 		// Recalc my entire subtree
@@ -268,6 +272,7 @@ public:
 		// But if itäs all zero because of first time, I do want it to happen
 		// its just we might get bullshit
 		void change_usage(int diff) {
+			size_t old_u = st.tree.usage;
 			assert(is_leaf());
 			assert(diff == 1); // Nothing else makes sense
 
@@ -296,7 +301,7 @@ public:
 
 			for(Node* p = this; p; p = p->parent) {
 				int new_usage = (int)p->usage + diff;
-				assert(0 <= new_usage);
+				assert(1 <= new_usage);
 
 				// THis assertion might be broken if weäre incrementing on an overridden node
 				// // Were counteracting above, hope it works
@@ -304,6 +309,8 @@ public:
 
 				p->usage = (size_t)new_usage;
 			}
+
+			assert(st.tree.usage == old_u +1);
 		}
 
 		bool is_nonstrict_parent_of(Node* x) {
@@ -525,19 +532,28 @@ void Sparse_Table::start_cleanup(Node* y) {
 
 // Ignoring second param from paper, probbly also a mistake
 void Sparse_Table::continue_cleanup(Node* y) {
+	size_t old_usage = y->Usage();
+	assert(old_usage != 0);
+
 	Node *last_leaf = nullptr;
 	for(size_t i = 0; i < alpha*L && y->get_is_cleaning(); i++) {
 		clean_step(y);
 
+		Node* curr_leaf = tree.leaf_over(y->get_last_w());
 		if(last_leaf == nullptr) {
-			last_leaf = tree.leaf_over(y->get_last_w());
+			last_leaf = curr_leaf;
 			continue;
 		}
 
-		Node* curr_leaf = tree.leaf_over(y->get_last_w());
+
+		// DOne with a leaf
 		if(curr_leaf != last_leaf) {
 			assert(last_leaf);
+			assert(last_leaf->data_index > curr_leaf->data_index);
+
 			last_leaf->bubble_update_usage();
+
+			assert(last_leaf->Usage() > 0);
 			last_leaf = curr_leaf;
 		}
 	}
@@ -605,6 +621,7 @@ void Sparse_Table::continue_cleanup(Node* y) {
 	}
 	w_leaf->bubble_update_usage();
 	// And now y's usage should be making sense
+	assert(y->Usage() == old_usage);
 }
 
 void Sparse_Table::clean_step(Node* y) { 

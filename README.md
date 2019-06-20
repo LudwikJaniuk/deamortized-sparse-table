@@ -101,9 +101,10 @@ DEAMORTIZATION
  	// I think it won't really work anymore? We explicitly have situations now where itäs violated
 	// TODO assertion for correct usages throughout tho
  6.4) Implement usage efficianlty
- 6.4.1) Usage query: check for 0 parent
- 6.4.2) Explicit increment s2
- 6.4.3) Recalc on finished leaf and propagate 
+
+ 6.4.1) Usage query: check for 0 parent DONE
+ 6.4.2) Explicit increment s2  DONE
+ 6.4.3) Recalc on finished leaf and propagate  DONE
 	Thsi probably leaves an error too but it is the same as in the zro case and will be corrected for at the end
  6.4.4) After end of continue
  6.4.4.1) zero mid subtrees 
@@ -120,3 +121,4 @@ DEAMORTIZATION
  7.2) finding next usable slot to the left
 
 
+MISTAKE SOMEOWHEWE with usage
