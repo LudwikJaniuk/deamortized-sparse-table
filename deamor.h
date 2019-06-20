@@ -503,18 +503,18 @@ void Sparse_Table::continue_cleanup(Node* y) {
 }
 
 void Sparse_Table::clean_step(Node* y) { 
-	y->set_w( y->pending_extra  // Opposite from paper because I believe that one's a mistake
-	        ? y->get_w()-1
-		: y->next_usable_strictly_left(y->get_w()));
+	size_t w = y->pending_extra  // Opposite from paper because I believe that one's a mistake
+	         ? y->get_w()-1
+	 	 : y->next_usable_strictly_left(y->get_w());
 
-	if(is_slack(y->get_w())) {
+	if(is_slack(w)) {
 		y->pending_extra = false;
 	}
-	size_t r = next_element_left(y->get_w());
+	size_t r = next_element_left(w);
 	assert(r >= y->data_index); // No change for slack here
 
-	if(r != y->get_w()) {
-		m.write(y->get_w(), m.read(r));
+	if(r != w) {
+		m.write(w, m.read(r));
 		m.delete_at(r);
 	}
 
@@ -522,8 +522,11 @@ void Sparse_Table::clean_step(Node* y) {
 	
 	Node* x = writer_at(r);
 	if(x && x != y) {
+		cout << "D " << r << " " << flush;
 		x->disable_cleaning();
 	}
+
+	y->set_w(w); // Delayed to keep invariants
 
 	if(y->get_w() == y->data_index + 1) {
 		y->disable_cleaning(); 
@@ -570,7 +573,8 @@ void Sparse_Table::insert_after(int index, unsigned value) {
 			}
 
 			// Hacky, ineffieient, but faster to implement and there is already too much insecurity
-			x->recalculate_usage(); // TODO
+			//x->recalculate_usage(); // TODO
+			y->recalculate_usage(); // Actually
 			if(can_start && x->Usage() >= x->cleaning_treshold()) {
 				start_cleanup(y);
 			}
