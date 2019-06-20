@@ -57,6 +57,8 @@ public:
 			, st(tab)
 		{};
 
+		// NOte: usage is either accurate, or if a parent is zero then the value doenst matter and it's zero by definition. 
+		// If I'm being overridden, uncrementing is kinda pointless no?
 		size_t Usage() { 
 			for(Node* a = parent; a; a = a->parent) {
 				if(a->usage == 0) return 0;
@@ -262,14 +264,44 @@ public:
 			return l;
 		}
 
+		// If I'm being overridden, incrementing is kinda pointless. 
+		// But if itäs all zero because of first time, I do want it to happen
+		// its just we might get bullshit
 		void change_usage(int diff) {
 			assert(is_leaf());
-			assert(diff == 1 || diff == -1); // Nothing else makes sense
+			assert(diff == 1); // Nothing else makes sense
+
+			//bool expecting_override = false;
+			//bool found_override = false;
+
+			// If we're being zeroed-out, we ought to make it explicit to make counts and asserts work again
+			Node * highest_zero = nullptr;
+			for(Node* p = this; p; p = p->parent) {
+				if(p->usage == 0) {
+					highest_zero = p;
+				}
+			}
+			if(highest_zero) {
+				bool valid_run = false;
+				for(Node* p = this; p; p = p->parent) {
+					if (p == highest_zero) {
+						valid_run = true;
+						break;
+					}
+
+					p->usage = 0;
+				}
+				assert(valid_run); // And not a fallthrough withough meethign that parent
+			}
 
 			for(Node* p = this; p; p = p->parent) {
 				int new_usage = (int)p->usage + diff;
 				assert(0 <= new_usage);
+
+				// THis assertion might be broken if weäre incrementing on an overridden node
+				// // Were counteracting above, hope it works
 				assert((size_t)new_usage <= p->data_length);
+
 				p->usage = (size_t)new_usage;
 			}
 		}
