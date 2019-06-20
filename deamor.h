@@ -66,6 +66,15 @@ public:
 
 			return usage; 
 		};
+
+		size_t real_usage() {
+			size_t ans = 0;
+			for(size_t i = data_index; i < data_index + data_length; i++) {
+				ans += (size_t)(!m.is_free(i));
+			}
+			return ans;
+		}
+
 		bool is_parent() { return left; }
 		bool is_leaf() { return !is_parent(); }
 		bool get_is_cleaning() {
@@ -224,10 +233,7 @@ public:
 		void recalculate_usage() {
 			usage = 0;
 			if(is_leaf()) {
-				size_t past_end = data_index + data_length;
-				for(size_t i = data_index; i < past_end; i++) {
-					usage += (size_t)(!m.is_free(i));
-				}
+				usage = real_usage();
 				return;
 			}
 
@@ -323,6 +329,16 @@ public:
 			return x->m_level < m_level
 			    && x->data_index >= data_index
 			    && (x->data_index + x->data_length) <= (data_index + data_length);
+		}
+
+		bool exp_is_parent_of(Node* x) {
+			assert(this);
+			assert(x);
+			assert(x != this);
+			for(Node* n = x; n; n = n->parent) {
+				if(n == this) return true;
+			}
+			return false;
 		}
 
 		Node* first_lawful_parent() {
@@ -534,6 +550,7 @@ void Sparse_Table::start_cleanup(Node* y) {
 void Sparse_Table::continue_cleanup(Node* y) {
 	size_t old_usage = y->Usage();
 	assert(old_usage != 0);
+	assert(old_usage == y->real_usage());
 
 	Node *last_leaf = nullptr;
 	for(size_t i = 0; i < alpha*L && y->get_is_cleaning(); i++) {
@@ -550,6 +567,7 @@ void Sparse_Table::continue_cleanup(Node* y) {
 		if(curr_leaf != last_leaf) {
 			assert(last_leaf);
 			assert(last_leaf->data_index > curr_leaf->data_index);
+			assert(y->is_parent_of(last_leaf));
 
 			last_leaf->bubble_update_usage();
 
@@ -557,6 +575,7 @@ void Sparse_Table::continue_cleanup(Node* y) {
 			last_leaf = curr_leaf;
 		}
 	}
+	// RIght around here the usage is probably already changed for y
 	assert(y->pending_extra == false);
 
 	// WHen is a leaf finished? If we just wrote on its leftmost usable slot? Buut we might still use the slack!
@@ -584,9 +603,11 @@ void Sparse_Table::continue_cleanup(Node* y) {
 	Node* r_leaf = tree.leaf_over(r);
 	Node* w_leaf = tree.leaf_over(w);
 
+	assert(y->is_parent_of(r_leaf));
+	assert(y->is_parent_of(w_leaf));
 
 	if (r_leaf != w_leaf) { // otherwise No logic gap big enough for any more action
-		assert(r != w);
+		assert(r < w);
 
 		// r and w are endpoints of the logic gap
 		// Frist zero all subtrees inside
@@ -619,8 +640,11 @@ void Sparse_Table::continue_cleanup(Node* y) {
 		// THen bubble the sentinels
 		r_leaf->bubble_update_usage(); // if they're the same no point doing it twice
 	}
+	assert(y->is_parent_of(w_leaf));
+	assert(y->exp_is_parent_of(w_leaf));
 	w_leaf->bubble_update_usage();
 	// And now y's usage should be making sense
+	assert(y->Usage() == y->real_usage());
 	assert(y->Usage() == old_usage);
 }
 

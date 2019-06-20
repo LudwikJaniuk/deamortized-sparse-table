@@ -122,3 +122,8 @@ DEAMORTIZATION
 
 
 MISTAKE SOMEOWHEWE with usage
+
+Seems like buffers we're skipping while cleaning, well since they are empty we are not setting them to 0 even tho they should be.
+And not their parents either...
+
+THink I need to make the presentation now.
