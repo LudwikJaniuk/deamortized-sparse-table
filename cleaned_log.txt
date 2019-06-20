@@ -1,0 +1,39 @@
+janiuk@janiuk-comp ~/Code/deamortized-sparse-table$ echo "32 5 100000 67000" | ./a.out n n l d                                                                                     ✹ ✭master 
+Mello World!
+Manually set L
+Manually set lgL (to the 2-log of L please)
+Manually set M_SIZE
+Manually set N_ELEMS
+depth is on 11
+capacity is on 80064
+
+Prim cap:65536
+usable cap:67584
+DATA LEN: 80064
+CLEANING off
+Verbosity off
+...................................................................
+R 2244466500 log10 9.35111
+W 2244533500 log10 9.35113
+C 2244613564 log10 9.35114
+Ending
+janiuk@janiuk-comp ~/Code/deamortized-sparse-table$ echo "32 5 100000 67000" | ./a.out c n l d                                                                                     ✹ ✭master 
+Mello World!
+Manually set L
+Manually set lgL (to the 2-log of L please)
+Manually set M_SIZE
+Manually set N_ELEMS
+depth is on 11
+capacity is on 80064
+
+Prim cap:65536
+usable cap:67584
+DATA LEN: 80064
+CLEANING ON
+Verbosity off
+...................................................................
+R 79003620 log10 7.89765
+W 79070620 log10 7.89802
+C 2748539932 log10 9.4391
+Ending
+
