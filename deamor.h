@@ -550,7 +550,7 @@ void Sparse_Table::start_cleanup(Node* y) {
 void Sparse_Table::continue_cleanup(Node* y) {
 	size_t old_usage = y->Usage();
 	assert(old_usage != 0);
-	assert(old_usage == y->real_usage());
+	assert(old_usage == y->real_usage()); // OPT only during debugging
 
 	Node *last_leaf = nullptr;
 	for(size_t i = 0; i < alpha*L && y->get_is_cleaning(); i++) {
@@ -644,7 +644,7 @@ void Sparse_Table::continue_cleanup(Node* y) {
 	assert(y->exp_is_parent_of(w_leaf));
 	w_leaf->bubble_update_usage();
 	// And now y's usage should be making sense
-	assert(y->Usage() == y->real_usage());
+	assert(y->Usage() == y->real_usage()); // Only while debugging, inefficient! Is this actually somehting we want?
 	assert(y->Usage() == old_usage);
 }
 
