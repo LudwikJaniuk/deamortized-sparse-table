@@ -30,9 +30,9 @@ DEAMORTIZATION
  2) start cleanups at lower treshold DONE
  3) incorporate slack slots DONE
  3.1) adapt old code DONE
- 4) adapt new algorithms
- 4.1) Reframe as startcleanup/continuecleanup
- 4.2) Maintain usage more relaxed
- 5) add checks for parent cleanup conflicts
+ 4) adapt new algorithms DONE
+ 4.1) Reframe as startcleanup/continuecleanup DONE
+ 5) add checks for parent cleanup conflicts DONE
+ 6) COmpute usage efficiently
 
 AFter lots of coding, finding the bugs bery hard. Going to bet.

@@ -400,7 +400,7 @@ public:
 		cout << endl;
 
 		assert(leaves.size() != 0);
-		writers = vector<Node*>(leaves.size(), nullptr);
+		writers = vector<Node*>(capacity, nullptr);
 
 		cout << "Prim cap:" << tree.primary_capacity << endl;
 		cout << "usable cap:" << tree.usable_capacity << endl;
@@ -523,7 +523,6 @@ void Sparse_Table::clean_step(Node* y) {
 	
 	Node* x = writer_at(r);
 	if(x && x != y) {
-		cout << "D " << r << " " << flush;
 		x->disable_cleaning();
 	}
 
@@ -553,7 +552,7 @@ void Sparse_Table::insert_after(int index, unsigned value) {
 	assert(s2_leaf);
 
 	// Increment usage as per algo
-	s2_leaf->change_usage(1);
+	//s2_leaf->change_usage(1); Don't because it's pointless anyway now
 
 	if(strategy == NOCLEAN) return;
 
