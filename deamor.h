@@ -42,7 +42,6 @@ public:
 
 		bool pending_extra = false;
 	private:
-		bool usage_fresh = false;
 		bool is_cleaning = false;
 		size_t write_index = 0;
 		size_t read_index = 0;
@@ -58,7 +57,13 @@ public:
 			, st(tab)
 		{};
 
-		size_t Usage() { assert(usage_fresh); return usage; };
+		size_t Usage() { 
+			for(Node* a = parent; a; a = a->parent) {
+				if(a->usage == 0) return 0;
+			}
+
+			return usage; 
+		};
 		bool is_parent() { return left; }
 		bool is_leaf() { return !is_parent(); }
 		bool get_is_cleaning() {
@@ -67,7 +72,6 @@ public:
 		void enable_cleaning(size_t w) {
 			assert(is_cleaning == false);
 
-			usage_fresh = false; // TODO PArt of my hacky scheme
 			set_w(w);
 			is_cleaning = true;
 		}
@@ -160,6 +164,15 @@ public:
 		}
 
 
+
+		// Set usage to 0 if this whole tre is insize the logic gap made by these two
+		void zero_if_subtree(size_t r, size_t w) { 
+			assert(r < w);
+			if(data_index > r && data_index + data_length - 1 < w) {
+				usage = 0;
+			}
+		}
+
 		// We can't require that parent is initialized or complete since this is used in initialization to climb upwards
 		void assert_parenthood() {
 			assert(parent);
@@ -196,7 +209,6 @@ public:
 
 		// Recalc my entire subtree
 		void recalculate_usage() {
-			usage_fresh = true;
 			usage = 0;
 			if(is_leaf()) {
 				size_t past_end = data_index + data_length;
@@ -462,45 +474,90 @@ size_t Sparse_Table::next_element_left(size_t i) { // No change for slack
 	assert(false); // Fall out
 }
 
-/*
-void Sparse_Table::clean(Node *x) {
-	assert(!x->is_leaf());
-	assert(x->buffer);
-
-	if(verbose) {
-		cout << "Doign a cleaning " << endl;
-		x->print_stats();
-	}
-
-	x->set_w(x->n_th_usable(x->Usage()))
-	do { 
-		clean_step(x);
-	} while (x->get_w() != x->n_th_usable(0));
-
-	tree.recalculate_usage(); // TODO THis will probbly be different more or less but no idea how exactly
-	if(verbose) {
-		x->print_stats();
-		tree.print_stats();
-	}
-}
-*/
-
 void Sparse_Table::start_cleanup(Node* y) {
+	// Are we skipping this one slot? Yes that's the point, we're supposed to skip it
 	y->enable_cleaning(y->n_th_usable(y->Usage()));
+
 	assert(y->pending_extra == false);
 	y->pending_extra = false;
 	continue_cleanup(y);
-
-
-	// TODO  When startup returns, update usage of endpoints of zero gap, and  more...
 }
 
 // Ignoring second param from paper, probbly also a mistake
 void Sparse_Table::continue_cleanup(Node* y) {
+	Node *last_leaf = nullptr;
 	for(size_t i = 0; i < alpha*L && y->get_is_cleaning(); i++) {
 		clean_step(y);
+
+		if(last_leaf == nullptr) {
+			last_leaf = tree.leaf_over(y->get_w());
+			continue;
+		}
+
+		Node* curr_leaf = tree.leaf_over(y->get_w());
+		if(curr_leaf != last_leaf) {
+			assert(last_leaf);
+			last_leaf->bubble_update_usage();
+			last_leaf = curr_leaf;
+		}
 	}
 	assert(y->pending_extra == false);
+
+	// WHen is a leaf finished? If we just wrote on its leftmost usable slot? Buut we might still use the slack!
+	// If we're at the leftmost usable slot of a leaf, we still can't know if the next write will be in teh slack slot.
+	// Can we know that the previous write was on a different leaf tho?
+	// IMplicitly or explicitly?
+	// clean_step ALWAYS moves the write pointer at least one step to the left. Might be much more tho. 
+	// Ok well seems like the easiest way is to maintain a "last_leaf" pointer explicitly inside of a 
+	// continuecleanup and pass it into the cleanupstep all the time. 
+	// OHH but reasonably that would always be the leaf of the last w. Except the first time. 
+	// Does it hurt to recompute the "last leaf" even the first time?
+	// it woudl be a departure that we can avoid with a boolean.
+	// so lets avoid it. 
+	// OHHH and actually what we can do is put it in continue
+	// TODO WHen leaf finished, update usage
+	
+	// TODO  When cleanup returns, update usage of endpoints of zero gap, and  more...
+
+	size_t w = y->get_w();
+	assert(!m.is_free(w));
+
+	size_t r = next_element_left(w);
+	assert(!m.is_free(r));
+
+	// r and w are endpoints of the logic gap
+	// Frist zero all subtrees inside
+	Node* r_leaf = tree.leaf_over(r);
+	for(Node *a = r_leaf->parent; a; a = a->parent) {
+		assert(a->left);
+		assert(a->left->data_index <= r); // Left would never be one of the subtrees inside logic gap
+
+		assert(a->right);
+		a->right->zero_if_subtree(r, w); 
+
+		if(a->buffer) a->buffer->zero_if_subtree(r, w); 
+
+		if(a == y) break; // OPT just an optimization
+	}
+
+	Node* w_leaf = tree.leaf_over(w);
+	for(Node *a = w_leaf->parent; a; a = a->parent) {
+		assert(a->left);
+		a->left->zero_if_subtree(r, w); 
+
+		assert(a->right);
+		a->right->zero_if_subtree(r, w); 
+
+		// Buffer shold never be an optin
+		if(a->buffer) assert(a->buffer->data_index + a->buffer->data_length - 1 >= w); 
+
+		if(a == y) break; // OPT just an optimization
+	}
+
+	// THen bubble the sentinels
+	r_leaf->bubble_update_usage();
+	w_leaf->bubble_update_usage();
+	// And now y's usage should be making sense
 }
 
 void Sparse_Table::clean_step(Node* y) { 
@@ -519,8 +576,7 @@ void Sparse_Table::clean_step(Node* y) {
 		m.delete_at(r);
 	}
 
-	// TODO WHen leaf finished, update usage
-	
+
 	Node* x = writer_at(r);
 	if(x && x != y) {
 		x->disable_cleaning();
@@ -552,7 +608,7 @@ void Sparse_Table::insert_after(int index, unsigned value) {
 	assert(s2_leaf);
 
 	// Increment usage as per algo
-	//s2_leaf->change_usage(1); Don't because it's pointless anyway now
+	s2_leaf->change_usage(1); 
 
 	if(strategy == NOCLEAN) return;
 
