@@ -82,12 +82,19 @@ public:
 
 			is_cleaning = false;
 			st.writers[write_index] = nullptr;
-			write_index = 0;
+			//write_index = 0; // We will actually be reading the final value later soo...
 		}
+
 		size_t get_w() {
 			assert(is_cleaning);
 			return write_index;
 		}
+
+		// Hacky passby
+		size_t get_last_w() {
+			return write_index;
+		}
+
 		void set_w(size_t w) {
 			assert(index_in_range(w));
 
@@ -261,7 +268,8 @@ public:
 
 			for(Node* p = this; p; p = p->parent) {
 				int new_usage = (int)p->usage + diff;
-				assert(0 <= new_usage && (size_t)new_usage <= p->data_length);
+				assert(0 <= new_usage);
+				assert((size_t)new_usage <= p->data_length);
 				p->usage = (size_t)new_usage;
 			}
 		}
@@ -426,7 +434,7 @@ public:
 		, tree(nullptr, mem, *this)
 	{
 		init_tree();
-		tree.recalculate_usage();
+		tree.recalculate_usage(); // Well I guess it can stay here
 	};
 	void insert_after(int index, unsigned value);
 	void delete_at(size_t index) {
@@ -490,11 +498,11 @@ void Sparse_Table::continue_cleanup(Node* y) {
 		clean_step(y);
 
 		if(last_leaf == nullptr) {
-			last_leaf = tree.leaf_over(y->get_w());
+			last_leaf = tree.leaf_over(y->get_last_w());
 			continue;
 		}
 
-		Node* curr_leaf = tree.leaf_over(y->get_w());
+		Node* curr_leaf = tree.leaf_over(y->get_last_w());
 		if(curr_leaf != last_leaf) {
 			assert(last_leaf);
 			last_leaf->bubble_update_usage();
@@ -519,43 +527,50 @@ void Sparse_Table::continue_cleanup(Node* y) {
 	
 	// TODO  When cleanup returns, update usage of endpoints of zero gap, and  more...
 
-	size_t w = y->get_w();
-	assert(!m.is_free(w));
-
+	size_t w = y->get_last_w();
 	size_t r = next_element_left(w);
+
+	assert(!m.is_free(w));
 	assert(!m.is_free(r));
 
-	// r and w are endpoints of the logic gap
-	// Frist zero all subtrees inside
 	Node* r_leaf = tree.leaf_over(r);
-	for(Node *a = r_leaf->parent; a; a = a->parent) {
-		assert(a->left);
-		assert(a->left->data_index <= r); // Left would never be one of the subtrees inside logic gap
-
-		assert(a->right);
-		a->right->zero_if_subtree(r, w); 
-
-		if(a->buffer) a->buffer->zero_if_subtree(r, w); 
-
-		if(a == y) break; // OPT just an optimization
-	}
-
 	Node* w_leaf = tree.leaf_over(w);
-	for(Node *a = w_leaf->parent; a; a = a->parent) {
-		assert(a->left);
-		a->left->zero_if_subtree(r, w); 
 
-		assert(a->right);
-		a->right->zero_if_subtree(r, w); 
 
-		// Buffer shold never be an optin
-		if(a->buffer) assert(a->buffer->data_index + a->buffer->data_length - 1 >= w); 
+	if (r_leaf != w_leaf) { // otherwise No logic gap big enough for any more action
+		assert(r != w);
 
-		if(a == y) break; // OPT just an optimization
+		// r and w are endpoints of the logic gap
+		// Frist zero all subtrees inside
+		for(Node *a = r_leaf->parent; a; a = a->parent) {
+			assert(a->left);
+			assert(a->left->data_index <= r); // Left would never be one of the subtrees inside logic gap
+
+			assert(a->right);
+			a->right->zero_if_subtree(r, w); 
+
+			if(a->buffer) a->buffer->zero_if_subtree(r, w); 
+
+			if(a == y) break; // OPT just an optimization
+		}
+
+
+		for(Node *a = w_leaf->parent; a; a = a->parent) {
+			assert(a->left);
+			a->left->zero_if_subtree(r, w); 
+
+			assert(a->right);
+			a->right->zero_if_subtree(r, w); 
+
+			// Buffer shold never be an optin
+			if(a->buffer) assert(a->buffer->data_index + a->buffer->data_length - 1 >= w); 
+
+			if(a == y) break; // OPT just an optimization
+		}
+
+		// THen bubble the sentinels
+		r_leaf->bubble_update_usage(); // if they're the same no point doing it twice
 	}
-
-	// THen bubble the sentinels
-	r_leaf->bubble_update_usage();
 	w_leaf->bubble_update_usage();
 	// And now y's usage should be making sense
 }
@@ -640,7 +655,7 @@ void Sparse_Table::insert_after(int index, unsigned value) {
 
 			// Hacky, ineffieient, but faster to implement and there is already too much insecurity
 			//x->recalculate_usage(); // TODO
-			y->recalculate_usage(); // Actually
+			//y->recalculate_usage(); // Actually
 			if(can_start && x->Usage() >= x->cleaning_treshold()) {
 				start_cleanup(y);
 			}
