@@ -73,6 +73,7 @@ public:
 		}
 		void disable_cleaning() {
 			assert(is_cleaning);
+			assert(pending_extra == false);
 			assert(st.writers[write_index] == this);
 
 			is_cleaning = false;
@@ -499,7 +500,7 @@ void Sparse_Table::continue_cleanup(Node* y) {
 	for(size_t i = 0; i < alpha*L && y->get_is_cleaning(); i++) {
 		clean_step(y);
 	}
-
+	assert(y->pending_extra == false);
 }
 
 void Sparse_Table::clean_step(Node* y) { 
@@ -529,6 +530,13 @@ void Sparse_Table::clean_step(Node* y) {
 	y->set_w(w); // Delayed to keep invariants
 
 	if(y->get_w() == y->data_index + 1) {
+		// Now either we did use the slack slot to restore equality,
+		// or the NEXT one would have been it in which case it should be occupied, right?
+		if(y->pending_extra) {
+			assert(!m.is_free(y->data_index));
+			// The next noop step would have taken the pending extra so:
+			y->pending_extra = false;
+		}
 		y->disable_cleaning(); 
 	}
 
@@ -559,6 +567,9 @@ void Sparse_Table::insert_after(int index, unsigned value) {
 			if(s2 >= y->data_index && s2 < y->get_w()) {
 				y->pending_extra = true;
 				// We just inserted something inside of y's ongoing cleaning
+				// Thus violating equality
+				// therefore within the cleaning rn, y is allowed to put one
+				// thing into a slack slot to restore balance.
 			}
 			continue_cleanup(y);
 		} else {
