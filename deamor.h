@@ -75,7 +75,7 @@ public:
 
 		void dump_usage() {
 			for(size_t i = data_index; i < data_index+data_length; i++) {
-				if(i % st.leaf_size() == 0) cout << " " << i << "/" << leaf_over(i)->Usage() << "/";
+				if(i % st.leaf_size() == 0) cout << " " << i << "/" << leaf_over(i)->Usage() << "m" << leaf_over(i)->usage << "/";
 				cout << (st.m.is_free(i) ? "_" : "1");
 			}
 			cout << endl;
@@ -211,6 +211,27 @@ public:
 			initialized = true;
 		}
 
+		void materialize_zero() {
+			assert(is_leaf());
+			assert(Usage() == 0);
+			//assert(real_usage() == 0); // OPT NO it's wrong we want to materialize efen iv
+
+			Node *hzp = nullptr;
+			for(Node *a = this; a; a = a->parent) {
+				if (a->usage == 0) hzp = a;
+			}
+
+			if(hzp == nullptr) return;
+
+			for(Node *a = this; ; a = a->parent) {
+				assert(a);
+				a->usage = 0;
+				if(a->left) a->left->usage = 0;
+				if(a->right) a->right->usage = 0;
+				if(a->buffer) a->buffer->usage = 0;
+				if(a == hzp) break;
+			}
+		}
 
 
 		// Set usage to 0 if this whole tre is insize the logic gap made by these two
@@ -238,8 +259,19 @@ public:
 		}
 
 		void bubble_update_usage() {
+			cout << "BU" << m_level << " " << data_index << endl;
+			// Important step otherwise we will reintroduce dirty values
+			if(is_leaf()) {
+				usage = real_usage();
+				if(Usage() == 0) materialize_zero();
+			}
+
 			for(Node* n = this; n; n = n->parent) {
 				n->update_usage();
+				if(n->m_level < 5) n->dump_usage();
+			}
+			if(is_leaf()) {
+				assert(usage == real_usage());
 			}
 		}
 
@@ -247,8 +279,13 @@ public:
 		void update_usage() {
 			if(is_leaf()) {
 				recalculate_usage();
+				dump_usage();
 				return;
 			}
+
+			cout << "USGS: " << left->usage << " " << right->usage << " ";
+			if(buffer) cout << buffer->usage << endl;
+			else cout << "nobuf" << endl;
 
 			usage = 0;
 			assert(left);
@@ -262,13 +299,17 @@ public:
 
 			//usage += buffer->Usage();
 			usage += buffer->usage;
+
+			cout << "USGS: " << left->usage << " " << right->usage << " ";
+			if(buffer) cout << buffer->usage << endl;
+			else cout << "nobuf" << endl;
 		}
 
 		// Recalc my entire subtree
 		void recalculate_usage() {
 			usage = 0;
 			if(is_leaf()) {
-				usage = real_usage();
+				usage = real_usage(); // TODO This is one place where usge could be set to 1 on a leaf
 				return;
 			}
 
@@ -336,6 +377,10 @@ public:
 					}
 
 					p->usage = 0;
+					
+					if(p->left) p->left->usage = 0;
+					if(p->right) p->right->usage = 0;
+					if(p->buffer) p->buffer->usage = 0;
 				}
 				assert(valid_run); // And not a fallthrough withough meethign that parent
 			}
@@ -348,10 +393,12 @@ public:
 				// // Were counteracting above, hope it works
 				assert((size_t)new_usage <= p->data_length);
 
-				p->usage = (size_t)new_usage;
+				p->usage = (size_t)new_usage; // TODO THis is another place 
 			}
 
 			assert(st.tree.usage == old_u +1);
+			assert(usage == Usage());
+			assert(usage == real_usage());
 		}
 
 		bool is_nonstrict_parent_of(Node* x) {
@@ -586,19 +633,23 @@ void Sparse_Table::continue_cleanup(Node* y) {
 	size_t old_usage = y->Usage();
 	assert(old_usage != 0);
 	assert(old_usage == y->real_usage()); // OPT only during debugging
-	cout << "BF" << endl;
-	y->dump_usage();
+	//cout << "BF" << endl;
+	//y->dump_usage();
 
 
 	Node *last_leaf = nullptr;
 	for(size_t i = 0; i < alpha*L && y->get_is_cleaning(); i++) {
 		clean_step(y);
+		cout << i << endl;
 
 		Node* curr_leaf = tree.leaf_over(y->get_last_w());
 		if(last_leaf == nullptr) {
 			last_leaf = curr_leaf;
 			continue;
 		}
+
+		cout << "lw " << last_leaf->get_last_w() << endl;
+		//y->dump_usage();
 
 
 		// DOne with a leaf
@@ -613,7 +664,11 @@ void Sparse_Table::continue_cleanup(Node* y) {
 			assert(last_leaf->data_index > curr_leaf->data_index);
 			assert(y->is_parent_of(last_leaf));
 
+			y->dump_usage();
+			cout << last_leaf->data_index << endl;
 			last_leaf->bubble_update_usage();
+			y->dump_usage();
+
 			assert(last_leaf->Usage() == last_leaf->real_usage());
 			if(last_leaf != curr_leaf->r_sibling) {
 				bool cleared_one_buffer = false;
@@ -647,6 +702,8 @@ void Sparse_Table::continue_cleanup(Node* y) {
 			//assert(curr_leaf->Usage() == curr_leaf->real_usage());
 			last_leaf = curr_leaf;
 		}
+
+		//y->dump_usage();
 	}
 	// RIght around here the usage is probably already changed for y
 	assert(y->pending_extra == false);
@@ -676,7 +733,6 @@ void Sparse_Table::continue_cleanup(Node* y) {
 
 
 	assert(!m.is_free(w));
-	assert(!m.is_free(r));
 
 	Node* r_leaf = tree.leaf_over(r);
 	Node* w_leaf = tree.leaf_over(w);
@@ -685,6 +741,7 @@ void Sparse_Table::continue_cleanup(Node* y) {
 	assert(y->is_parent_of(w_leaf));
 
 	if (r_leaf != w_leaf) { // otherwise No logic gap big enough for any more action
+		assert(m.is_free(r));
 		assert(r < w);
 
 		// r and w are endpoints of the logic gap
@@ -787,6 +844,7 @@ void Sparse_Table::insert_after(int index, unsigned value) {
 
 	// Increment usage as per algo
 	s2_leaf->change_usage(1); 
+	assert(s2_leaf->Usage() == s2_leaf->real_usage()); // OPT
 
 	if(strategy == NOCLEAN) return;
 
