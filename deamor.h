@@ -751,9 +751,10 @@ void Sparse_Table::continue_cleanup(Node* y) {
 		r_leaf->bubble_update_usage(); // if they're the same no point doing it twice
 	}
 	assert(y->is_parent_of(w_leaf));
-	assert(y->exp_is_parent_of(w_leaf));
+	//assert(y->exp_is_parent_of(w_leaf));
 	w_leaf->bubble_update_usage();
 	// And now y's usage should be making sense
+	 /*
 	if(y->Usage() != y->real_usage()) {
 		cout << "YUS" << y->Usage() << endl;
 		cout << "YRUS" << y->real_usage() << endl;
@@ -766,7 +767,8 @@ void Sparse_Table::continue_cleanup(Node* y) {
 		y->dump_usage();
 		y->dump_Usages();
 	}
-	assert(y->Usage() == y->real_usage()); // Only while debugging, inefficient! Is this actually somehting we want? // OPT
+	*/
+	//assert(y->Usage() == y->real_usage()); // Only while debugging, inefficient! Is this actually somehting we want? // OPT
 	assert(y->Usage() == old_usage);
 }
 
