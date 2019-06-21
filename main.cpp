@@ -5,69 +5,72 @@
 using namespace std;
 
 int main(int argc, char** argv) {
-	cout << "Mello World!" << endl;
-
 	size_t M_SIZE = 100000;
 	size_t N_ELEMS =  9000;
 
 	size_t L = 4;
 	size_t lgL = 2;
-	if(argc >= 4) {
-		if(argv[3][0] == 'l') {
-			cout << "Manually set L" << endl;
-			cin >> L;
-			cout << "Manually set lgL (to the 2-log of L please)" << endl;
-			cin >> lgL;
-		} else if(argv[3][0] == 'n') {
-			cout << "Leaving L lgL as in source code" << endl;
-		} else {
-			cout << "Invalid command line option 3" << endl;
-		}
-	}
 
-	if(argc >= 5) {
-		if(argv[4][0] == 'd') {
-			cout << "Manually set M_SIZE" << endl;
-			cin >> M_SIZE;
-			cout << "Manually set N_ELEMS" << endl;
-			cin >> N_ELEMS;
-		} else if(argv[3][0] == 'n') {
-			cout << "Leaving M_SIZE N_ELEMS as in source code" << endl;
-		} else {
-			cout << "Invalid command line option 3" << endl;
-		}
-	}
+	bool cleaning = true;
+	bool verbose = false;
 
-	Memory m(M_SIZE);
-
-	Sparse_Table st(m, L, lgL);
-
-
-
+	// Either defaults or all manual
 	if(argc >= 2) {
+		if (argc < 7) {
+			cout << "Invalid args" << endl;
+			return 1;
+		}
+
 		if(argv[1][0] == 'c') {
-			st.strategy = Sparse_Table::Strategy::CLEAN;
-			cout << "CLEANING ON" << endl;
+			cleaning = true;
 		} else if (argv[1][0] == 'n'){
-			st.strategy = Sparse_Table::Strategy::NOCLEAN;
-			cout << "CLEANING off" << endl;
+			cleaning = false;
 		} else {
 			cout << "Invalid command line option" << endl;
+			return 1;
 		}
-	}
 
-	bool verbose = false;
-	if(argc >= 3) {
 		if(argv[2][0] == 'v') {
 			verbose = true;
 			cout << "Verbosity on" << endl;
 		} else if(argv[2][0] == 'n') {
 			verbose = false;
-			cout << "Verbosity off" << endl;
 		} else {
 			cout << "Invalid command line option 2" << endl;
+			return 1;
 		}
+
+		cout << (cleaning ? "c" : "nc") <<  " " << (verbose ? "v" : "nv") << " ";
+
+		stringstream ss;
+		ss << argv[3];
+		ss >> L;
+		cout << "L " << L << " ";
+
+		ss.clear(); ss.str("");
+		ss << argv[4];
+		ss >> lgL;
+		cout << "lgL " << lgL << " ";
+
+		ss.clear(); ss.str("");
+		ss << argv[5];
+		ss >> M_SIZE;
+		cout << "MSIZE " << M_SIZE << " ";
+
+		ss.clear(); ss.str("");
+		ss << argv[6];
+		ss >> N_ELEMS;
+		cout << "NELEMS " << N_ELEMS << endl;
+
 	}
+	Memory m(M_SIZE);
+
+	Sparse_Table st(m, L, lgL);
+
+	st.strategy = cleaning 
+	 ? Sparse_Table::Strategy::CLEAN
+	 : Sparse_Table::Strategy::NOCLEAN;
+
 	st.verbose = verbose;
 
 	m.stats_checkpoint();
@@ -76,8 +79,7 @@ int main(int argc, char** argv) {
 
 		m.stats_checkpoint();
 		if (verbose) m.print_usage();
-
-		else if (i % 1000 == 0) cout << "." << flush;  
+		else if (i % 5000 == 0) cout << "." << flush;  
 	}
 	cout << endl;
 	m.print_summary();
