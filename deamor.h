@@ -244,7 +244,7 @@ public:
 		}
 
 		void zero_usage() {
-			assert(real_usage() == 0); // OPT
+			//assert(real_usage() == 0); // OPT
 			usage = 0;
 		}
 
@@ -259,7 +259,6 @@ public:
 		}
 
 		void bubble_update_usage() {
-			cout << "BU" << m_level << " " << data_index << endl;
 			// Important step otherwise we will reintroduce dirty values
 			if(is_leaf()) {
 				usage = real_usage();
@@ -268,7 +267,6 @@ public:
 
 			for(Node* n = this; n; n = n->parent) {
 				n->update_usage();
-				if(n->m_level < 5) n->dump_usage();
 			}
 			if(is_leaf()) {
 				assert(usage == real_usage());
@@ -279,13 +277,8 @@ public:
 		void update_usage() {
 			if(is_leaf()) {
 				recalculate_usage();
-				dump_usage();
 				return;
 			}
-
-			cout << "USGS: " << left->usage << " " << right->usage << " ";
-			if(buffer) cout << buffer->usage << endl;
-			else cout << "nobuf" << endl;
 
 			usage = 0;
 			assert(left);
@@ -299,10 +292,6 @@ public:
 
 			//usage += buffer->Usage();
 			usage += buffer->usage;
-
-			cout << "USGS: " << left->usage << " " << right->usage << " ";
-			if(buffer) cout << buffer->usage << endl;
-			else cout << "nobuf" << endl;
 		}
 
 		// Recalc my entire subtree
@@ -632,25 +621,18 @@ void Sparse_Table::start_cleanup(Node* y) {
 void Sparse_Table::continue_cleanup(Node* y) {
 	size_t old_usage = y->Usage();
 	assert(old_usage != 0);
-	assert(old_usage == y->real_usage()); // OPT only during debugging
-	//cout << "BF" << endl;
-	//y->dump_usage();
+	//assert(old_usage == y->real_usage()); // OPT only during debugging
 
 
 	Node *last_leaf = nullptr;
 	for(size_t i = 0; i < alpha*L && y->get_is_cleaning(); i++) {
 		clean_step(y);
-		cout << i << endl;
 
 		Node* curr_leaf = tree.leaf_over(y->get_last_w());
 		if(last_leaf == nullptr) {
 			last_leaf = curr_leaf;
 			continue;
 		}
-
-		cout << "lw " << last_leaf->get_last_w() << endl;
-		//y->dump_usage();
-
 
 		// DOne with a leaf
 		if(curr_leaf != last_leaf) {
@@ -664,10 +646,7 @@ void Sparse_Table::continue_cleanup(Node* y) {
 			assert(last_leaf->data_index > curr_leaf->data_index);
 			assert(y->is_parent_of(last_leaf));
 
-			y->dump_usage();
-			cout << last_leaf->data_index << endl;
 			last_leaf->bubble_update_usage();
-			y->dump_usage();
 
 			assert(last_leaf->Usage() == last_leaf->real_usage());
 			if(last_leaf != curr_leaf->r_sibling) {
@@ -703,14 +682,10 @@ void Sparse_Table::continue_cleanup(Node* y) {
 			last_leaf = curr_leaf;
 		}
 
-		//y->dump_usage();
 	}
 	// RIght around here the usage is probably already changed for y
 	assert(y->pending_extra == false);
 
-	cout << "lvs" << endl;
-	y->dump_usage();
-	cout << "final" << endl;
 
 	// WHen is a leaf finished? If we just wrote on its leftmost usable slot? Buut we might still use the slack!
 	// If we're at the leftmost usable slot of a leaf, we still can't know if the next write will be in teh slack slot.
@@ -791,7 +766,7 @@ void Sparse_Table::continue_cleanup(Node* y) {
 		y->dump_usage();
 		y->dump_Usages();
 	}
-	assert(y->Usage() == y->real_usage()); // Only while debugging, inefficient! Is this actually somehting we want?
+	assert(y->Usage() == y->real_usage()); // Only while debugging, inefficient! Is this actually somehting we want? // OPT
 	assert(y->Usage() == old_usage);
 }
 
@@ -810,7 +785,6 @@ void Sparse_Table::clean_step(Node* y) {
 		m.write(w, m.read(y->r));
 		m.delete_at(y->r);
 	}
-	cout << "r" << y->r << "w" << w << " " << flush;
 
 	Node* x = writer_at(y->r);
 	if(x && x != y) {
@@ -844,7 +818,7 @@ void Sparse_Table::insert_after(int index, unsigned value) {
 
 	// Increment usage as per algo
 	s2_leaf->change_usage(1); 
-	assert(s2_leaf->Usage() == s2_leaf->real_usage()); // OPT
+	//assert(s2_leaf->Usage() == s2_leaf->real_usage()); // OPT
 
 	if(strategy == NOCLEAN) return;
 
