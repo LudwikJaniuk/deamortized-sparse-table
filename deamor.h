@@ -57,6 +57,11 @@ public:
 			, st(tab)
 		{};
 
+		bool is_right_child() {
+			assert_parenthood();
+			return parent->right == this;
+		}
+
 		// NOte: usage is either accurate, or if a parent is zero then the value doenst matter and it's zero by definition. 
 		// If I'm being overridden, uncrementing is kinda pointless no?
 		size_t Usage() { 
@@ -66,6 +71,30 @@ public:
 
 			return usage; 
 		};
+
+		void dump_usage() {
+			for(size_t i = 0; i < data_length; i++) {
+				if(i % st.leaf_size() == 0) cout << " ";
+				cout << (st.m.is_free(data_index + i) ? "_" : "1");
+			}
+			cout << endl;
+		}
+
+		void dump_Usages() {
+			cout << "ID[" << m_level << "." << level_offset << "co" << parent->m_level << "." << parent->level_offset <<  "] " << Usage() << " " << usage << " " << real_usage();
+			if (left) {
+				cout << "\nL";
+				left->dump_Usages();
+			}
+			if (right) {
+				cout << "\nR";
+				right->dump_Usages();
+			}
+			if (buffer) {
+				cout << "\nB";
+				buffer->dump_Usages();
+			}
+		}
 
 		size_t real_usage() {
 			size_t ans = 0;
@@ -190,6 +219,11 @@ public:
 			if(data_index > r && data_index + data_length - 1 < w) {
 				usage = 0;
 			}
+		}
+
+		void zero_usage() {
+			assert(real_usage() == 0); // OPT
+			usage = 0;
 		}
 
 		// We can't require that parent is initialized or complete since this is used in initialization to climb upwards
@@ -552,6 +586,7 @@ void Sparse_Table::continue_cleanup(Node* y) {
 	assert(old_usage != 0);
 	assert(old_usage == y->real_usage()); // OPT only during debugging
 
+
 	Node *last_leaf = nullptr;
 	for(size_t i = 0; i < alpha*L && y->get_is_cleaning(); i++) {
 		clean_step(y);
@@ -565,11 +600,37 @@ void Sparse_Table::continue_cleanup(Node* y) {
 
 		// DOne with a leaf
 		if(curr_leaf != last_leaf) {
+			// NOte the last leaf might be several leaves behind... because 
+			// we might havbe jumped over a lower-level buffer because no primary spots there. 
+			// We did probably take stuff out from those buffers tho, but now they are zero
+			// So when are they gonna get zeroed?
+			// I thnk (original thought) we need to zero them by traversing the leaf we're entering now. 
+			// set all buffers up to a cerain level to 0
 			assert(last_leaf);
 			assert(last_leaf->data_index > curr_leaf->data_index);
 			assert(y->is_parent_of(last_leaf));
 
 			last_leaf->bubble_update_usage();
+			if(last_leaf != curr_leaf->r_sibling) {
+				bool cleared_one_buffer = false;
+				// We did skip some buffers
+				assert(curr_leaf->is_right_child());
+				// set all buffers subtrees we skipped
+				assert(curr_leaf->parent);
+				for(Node *a = curr_leaf->parent; !a->is_parent_of(last_leaf); a = a->parent) {
+					assert(a->parent);
+					assert(a->m_level < y->m_level);
+					assert(a->is_right_child() || a->parent->is_parent_of(last_leaf));
+					if(cleared_one_buffer) assert(a->buffer);
+					if(a->buffer) {
+						a->buffer->zero_usage();
+						cleared_one_buffer = true;
+					}
+				}
+				assert(cleared_one_buffer);
+			}
+
+
 
 			assert(last_leaf->Usage() > 0);
 			last_leaf = curr_leaf;
@@ -644,6 +705,18 @@ void Sparse_Table::continue_cleanup(Node* y) {
 	assert(y->exp_is_parent_of(w_leaf));
 	w_leaf->bubble_update_usage();
 	// And now y's usage should be making sense
+	if(y->Usage() != y->real_usage()) {
+		cout << "YUS" << y->Usage() << endl;
+		cout << "YRUS" << y->real_usage() << endl;
+		cout << "LUS" << y->left->Usage() << endl;
+		cout << "LRUS" << y->left->real_usage() << endl;
+		cout << "RUS" << y->right->Usage() << endl;
+		cout << "RRUS" << y->right->real_usage() << endl;
+		cout << "BUS" << y->buffer->Usage() << endl;
+		cout << "BRUS" << y->buffer->real_usage() << endl;
+		y->dump_usage();
+		y->dump_Usages();
+	}
 	assert(y->Usage() == y->real_usage()); // Only while debugging, inefficient! Is this actually somehting we want?
 	assert(y->Usage() == old_usage);
 }

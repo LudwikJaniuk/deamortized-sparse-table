@@ -127,3 +127,17 @@ Seems like buffers we're skipping while cleaning, well since they are empty we a
 And not their parents either...
 
 THink I need to make the presentation now.
+
+I think to maintain the usage correctly, when cleaning algo hops over a buffer, that buffer need to be cleared too. 
+Q Is this still constant in the number of leaves went over?
+We're going over alpha leaves...
+When finisheing a leaf, we are updating its value and all of its ancestors
+What's missing would be that while traversing up the ancestors on a finished leaf, 
+	as long as we're under y, 
+	any buffer is known to be clean! Right?
+	So zero them on the way there!...
+	When finisheing a leaf, we are updating its value and all of its ancestors
+	What's missing would be that while traversing up the ancestors on a finished leaf, 
+		as long as we're under y, 
+		any buffer is known to be clean! Right?
+		So zero them on the way there!
