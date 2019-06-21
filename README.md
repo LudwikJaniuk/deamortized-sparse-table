@@ -145,3 +145,8 @@ What's missing would be that while traversing up the ancestors on a finished lea
 We're reading left of the final readpointer!!!
 final readpointer is calculated incorrectly, itäs recalculated after thew write which maeks it same as w.
 need to save its last value instead.
+
+It's done, it works. 
+One drawback is we're not scanning left for next occupied efficiently. could be done with a linked list.
+
+

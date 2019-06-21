@@ -81,11 +81,20 @@ public:
 	}
 
 	void print_summary() {
+		cout << "R, lg10R, W, lg10W, C, lg10C, wdR, lg10wdR, wdW, lg10wdW, wdC, lg10wdC" << endl;
+		cout << n_reads << ", " << log10(n_reads) << ", " 
+		     << n_writes  << ", " << log10(n_writes) << ", " 
+		     << n_free_checks << ", " << log10(n_free_checks) << ", "
+		     << n_reads_worst_diff << ", " << log10(n_reads_worst_diff) << ", "
+		     << n_writes_worst_diff  << ", " << log10(n_writes_worst_diff ) << ", "
+		     << n_free_checks_worst_diff  << ", " << log10(n_free_checks_worst_diff ) << endl;
+		/*
 		cout << "R " << n_reads << " log10 " << log10(n_reads) << endl;
 		cout << "wd " << n_reads_worst_diff << " log10 " << log10(n_reads_worst_diff) << endl;
 		cout << "W " << n_writes << " log10 " << log10(n_writes) << endl;
 		cout << "wd " << n_writes_worst_diff  << " log10 " << log10(n_writes_worst_diff ) << endl;
 		cout << "C " << n_free_checks << " log10 " << log10(n_free_checks) << endl;
 		cout << "wd " << n_free_checks_worst_diff  << " log10 " << log10(n_free_checks_worst_diff ) << endl;
+		*/
 	}
 };

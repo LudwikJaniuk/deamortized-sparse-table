@@ -78,8 +78,8 @@ int main(int argc, char** argv) {
 		st.insert_after(-1, i);
 
 		m.stats_checkpoint();
-		if (verbose) m.print_usage();
-		else if (i % 5000 == 0) cout << "." << flush;  
+		//if (verbose) m.print_usage();
+		//else if (i % 5000 == 0) cout << "." << flush;  
 	}
 	cout << endl;
 	m.print_summary();
@@ -104,5 +104,5 @@ int main(int argc, char** argv) {
 		n++;
 	}
 
-	cout << "Ending" << endl;
+	//cout << "Ending" << endl;
 }

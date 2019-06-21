@@ -97,6 +97,7 @@ public:
 			}
 		}
 
+		// TODO Performance impact?
 		size_t real_usage() {
 			size_t ans = 0;
 			for(size_t i = data_index; i < data_index + data_length; i++) {
@@ -298,7 +299,7 @@ public:
 		void recalculate_usage() {
 			usage = 0;
 			if(is_leaf()) {
-				usage = real_usage(); // TODO This is one place where usge could be set to 1 on a leaf
+				usage = real_usage();
 				return;
 			}
 
@@ -382,7 +383,7 @@ public:
 				// // Were counteracting above, hope it works
 				assert((size_t)new_usage <= p->data_length);
 
-				p->usage = (size_t)new_usage; // TODO THis is another place 
+				p->usage = (size_t)new_usage; 
 			}
 
 			assert(st.tree.usage == old_u +1);
@@ -597,7 +598,7 @@ bool Sparse_Table::is_slack(size_t i) {
 
 // Paper discusses maintaining a linked list of occupied elements to speed up this and other traversals.
 // This is faster to imlement right now.
-// TODO improve maybe
+// TODO Performance impact
 // Note: there must be an element to the left. 
 // Note: Nonstrict as per paper.
 size_t Sparse_Table::next_element_left(size_t i) { // No change for slack
@@ -870,6 +871,7 @@ void Sparse_Table::shuffle_right(size_t left_border, size_t right_free) {
 	m.delete_at(left_border);
 }
 
+// TODO Performance impact?
 size_t Sparse_Table::first_free_right_of(int index) {
 	assert(index >= 0 || index == -1);
 	for(size_t i = index+1; i < m.data.size(); i++) {
