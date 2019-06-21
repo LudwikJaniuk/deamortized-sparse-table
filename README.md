@@ -1,5 +1,13 @@
 # deamortized-sparse-table
 
+I recommend not reading below, it was a log of work in progress.
+In any case, to compile, execute `g++ main.cpp -g -std=c++11 -Wall -Wextra -Wpedantic -O3`
+Run some tests with `sh test.sh`
+
+I might clean this page up in the future. 
+
+====================================
+
 Soo, we want to implement at least the amortized version of the deamortized version of sparse tables using the asymetric ternary tree.
 Do we want some kind of simplifying library? or rather, interface?
 Like, "store X at Y"? 

@@ -1,3 +1,4 @@
+N; Cleaning; L; lgL; R; lg10R; W; lg10W; C; lg10C; wdR; lg10wdR; wdW; lg10wdW; wdC; lg10wdC
 N = 1000
 No cleaning, page size irrelevant: 
 nc nv L 4 lgL 2 MSIZE 5000 NELEMS 1000
