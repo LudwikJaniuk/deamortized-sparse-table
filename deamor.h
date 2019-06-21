@@ -32,13 +32,14 @@ public:
 		Node* right = nullptr;
 		Node* buffer = nullptr;
 
-
 		size_t data_index;
 		size_t data_length;
 		size_t primary_capacity;
 		size_t usable_capacity;
 		size_t m_level = 0;
 		size_t level_offset = 0;
+
+		size_t r;
 
 		bool pending_extra = false;
 	private:
@@ -74,7 +75,7 @@ public:
 
 		void dump_usage() {
 			for(size_t i = data_index; i < data_index+data_length; i++) {
-				if(i % st.leaf_size() == 0) cout << " " << i << "/";
+				if(i % st.leaf_size() == 0) cout << " " << i << "/" << leaf_over(i)->Usage() << "/";
 				cout << (st.m.is_free(i) ? "_" : "1");
 			}
 			cout << endl;
@@ -585,6 +586,8 @@ void Sparse_Table::continue_cleanup(Node* y) {
 	size_t old_usage = y->Usage();
 	assert(old_usage != 0);
 	assert(old_usage == y->real_usage()); // OPT only during debugging
+	cout << "BF" << endl;
+	y->dump_usage();
 
 
 	Node *last_leaf = nullptr;
@@ -611,6 +614,7 @@ void Sparse_Table::continue_cleanup(Node* y) {
 			assert(y->is_parent_of(last_leaf));
 
 			last_leaf->bubble_update_usage();
+			assert(last_leaf->Usage() == last_leaf->real_usage());
 			if(last_leaf != curr_leaf->r_sibling) {
 				bool cleared_one_buffer = false;
 				// We did skip some buffers
@@ -630,14 +634,26 @@ void Sparse_Table::continue_cleanup(Node* y) {
 				assert(cleared_one_buffer);
 			}
 
-
+			// Assert zeroing did the trick
+			for(Node *b = last_leaf->l_sibling; b != curr_leaf; b = b->l_sibling) {
+				assert(b);
+				assert(b->Usage() == 0);
+				assert(b->real_usage() == 0);
+			}
+			// Seems it did...
 
 			assert(last_leaf->Usage() > 0);
+			// The ones we arrive at definitely don't need to be correct, we've been reading from them after all.
+			//assert(curr_leaf->Usage() == curr_leaf->real_usage());
 			last_leaf = curr_leaf;
 		}
 	}
 	// RIght around here the usage is probably already changed for y
 	assert(y->pending_extra == false);
+
+	cout << "lvs" << endl;
+	y->dump_usage();
+	cout << "final" << endl;
 
 	// WHen is a leaf finished? If we just wrote on its leftmost usable slot? Buut we might still use the slack!
 	// If we're at the leftmost usable slot of a leaf, we still can't know if the next write will be in teh slack slot.
@@ -656,7 +672,8 @@ void Sparse_Table::continue_cleanup(Node* y) {
 	// TODO  When cleanup returns, update usage of endpoints of zero gap, and  more...
 
 	size_t w = y->get_last_w();
-	size_t r = next_element_left(w);
+	size_t r = y->r;
+
 
 	assert(!m.is_free(w));
 	assert(!m.is_free(r));
@@ -729,16 +746,16 @@ void Sparse_Table::clean_step(Node* y) {
 	if(is_slack(w)) {
 		y->pending_extra = false;
 	}
-	size_t r = next_element_left(w);
-	assert(r >= y->data_index); // No change for slack here
+	y->r = next_element_left(w);
+	assert(y->r >= y->data_index); // No change for slack here
 
-	if(r != w) {
-		m.write(w, m.read(r));
-		m.delete_at(r);
+	if(y->r != w) {
+		m.write(w, m.read(y->r));
+		m.delete_at(y->r);
 	}
+	cout << "r" << y->r << "w" << w << " " << flush;
 
-
-	Node* x = writer_at(r);
+	Node* x = writer_at(y->r);
 	if(x && x != y) {
 		x->disable_cleaning();
 	}

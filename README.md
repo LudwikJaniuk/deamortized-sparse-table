@@ -141,3 +141,7 @@ What's missing would be that while traversing up the ancestors on a finished lea
 		as long as we're under y, 
 		any buffer is known to be clean! Right?
 		So zero them on the way there!
+
+We're reading left of the final readpointer!!!
+final readpointer is calculated incorrectly, itäs recalculated after thew write which maeks it same as w.
+need to save its last value instead.
