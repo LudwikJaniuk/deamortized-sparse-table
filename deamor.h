@@ -73,15 +73,15 @@ public:
 		};
 
 		void dump_usage() {
-			for(size_t i = 0; i < data_length; i++) {
-				if(i % st.leaf_size() == 0) cout << " ";
-				cout << (st.m.is_free(data_index + i) ? "_" : "1");
+			for(size_t i = data_index; i < data_index+data_length; i++) {
+				if(i % st.leaf_size() == 0) cout << " " << i << "/";
+				cout << (st.m.is_free(i) ? "_" : "1");
 			}
 			cout << endl;
 		}
 
 		void dump_Usages() {
-			cout << "ID[" << m_level << "." << level_offset << "co" << parent->m_level << "." << parent->level_offset <<  "] " << Usage() << " " << usage << " " << real_usage();
+			cout << "ID[" << m_level << "." << level_offset << "." << data_index << "co" << parent->m_level << "." << parent->level_offset << "." << parent->data_index << "] " << Usage() << " " << usage << " " << real_usage() << flush;
 			if (left) {
 				cout << "\nL";
 				left->dump_Usages();
